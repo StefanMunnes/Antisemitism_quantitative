@@ -98,6 +98,14 @@ data_comment <- data_code |>
   ) |>
   # 2.3 remove duplicates (most I1ASC & I1a, some I1 & I0)
   distinct(document, code_start, code_main, .keep_all = TRUE) |>
+  # correct ideation without metadata (start not overlapping with metadata)
+  arrange(document, code_end, desc(code_main)) |>
+  mutate(code_start = ifelse(
+    code_main == "1) Ideation" & lag(code) == "Metadata" & # just ideation
+      code_start == code_end & code_start - lag(code_start) == 1, # starts later
+    code_start - 1,
+    code_start
+  )) |>
   # 2.4 transform to wide: two columns: one for metadata, one for whole comment
   pivot_wider(
     id_cols = c(country, discourse, document, code_start),
@@ -133,14 +141,16 @@ as.data.frame(data_comment) |>
   mutate(wrong_codings = n() > 1, .by = c("document", "code_end")) |>
   mutate(
     # duplicates of ideation (except I1ASC + I1a)
-    dup_ideation = str_count(CodesComb, "I") > 1 &
+    dup_idea = str_count(CodesComb, "I") > 1 &
       !str_detect(CodesComb, "I1ASC.+I1a"),
-    # empty or to short ideation coding
-    no_ideation = is.na(Ideation) | str_length(Ideation) < 3,
+    # filter by CodesComb, b/c error handling or short ideation text
+    no_idea = CodesComb == "Metadata" | str_length(Ideation) < 3,
     # empty or to short metadata coding (to short for YT export)
-    no_metadata = is.na(Metadata) | str_length(Metadata) < 6
+    no_meta = is.na(Metadata) | str_length(Metadata) < 6,
+    # multi comment coding
+    multi_com = code_end - code_start > 2
   ) |>
-  filter(wrong_codings | dup_ideation | no_metadata | no_ideation) |>
+  filter(wrong_codings | dup_idea | no_meta | no_idea | multi_com) |>
   select(
     country, discourse, document,
     wrong_codings, dup_ideation, no_ideation, no_metadata,
@@ -158,14 +168,22 @@ data_all <- data_comment |>
     n() == 1 | (str_detect(CodesComb, "I") & str_detect(CodesComb, "Meta")),
     .by = c("document", "code_end")
   ) |>
-  # 3.2 join comment-wise with code data (choose just missing variables)
+  # 3.2 correct wrong end for comments w\ missing ideation (for joining by end)
+  # BUT: deal with cases where it would result in two identical endings
+  mutate(code_end = ifelse(
+    code_start == code_end & is.na(Ideation) &
+      lag(code_end) - code_end != 1 & lead(code_end) - code_end != 1,
+    code_end + 1,
+    code_end
+  )) |>
+  # 3.3 join comment-wise with code data (choose just missing variables)
   select(!c(Ideation, Metadata, CodesComb, country, discourse)) |>
   full_join(
     select(data_code, !c(comment, code_start)),
     by = c("document", "code_end"),
     relationship = "one-to-many"
   ) |>
-  # 3.3 remove metadata and missing codes (see validation in 1.3.3)
+  # 3.4 remove metadata and missing codes (see validation in 1.3.3)
   filter(code != "Metadata", !is.na(code)) |>
   # create
   mutate(
@@ -174,7 +192,7 @@ data_all <- data_comment |>
     .by = c(document, comment_id)
   )
 # |>
-# # 3.4 select and order all important variables
+# # 3.5 select and order all important variables
 # select(
 #   country, discourse, document, code_main, code, code_name, comment,
 #   comment_id, comment_code_segment, comment_user, comment_level,
