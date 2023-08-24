@@ -110,7 +110,7 @@ data_comment <- data_code |>
   pivot_wider(
     id_cols = c(country, discourse, document, code_start),
     names_from = code_main,
-    values_from = comment_code_segment,
+    values_from = code_segment,
     unused_fn = list(CodesComb = first, code_end = max)
   ) |>
   rename(Ideation = "1) Ideation") |>
@@ -195,7 +195,7 @@ data_all <- data_comment |>
 # # 3.5 select and order all important variables
 # select(
 #   country, discourse, document, code_main, code, code_name, comment,
-#   comment_id, comment_code_segment, comment_user, comment_level,
+#   comment_id, code_segment, comment_user, comment_level,
 #   comment_date_time, comment_codes_all, comment_codes_n, code_created,
 #   code_system, code_orig, source_type, source_outlet, source_date,
 #   source_title, source_comments_n, source_comments_n, source_url, source_text

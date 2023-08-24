@@ -52,8 +52,8 @@ data_document <- data_raw |>
     code_start = Beginning,
     code_end = End,
     code_created = Created,
-    comment = Comment,
-    comment_code_segment = Segment
+    code_segment = Segment,
+    comment = Comment
   ) |>
   # 2.2 keep and order important variables
   select(document, starts_with("code_"), starts_with("comment"), path) |>

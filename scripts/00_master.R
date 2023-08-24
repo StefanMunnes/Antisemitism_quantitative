@@ -7,7 +7,7 @@ pacman::p_load(
 source("scripts/01_create_document_data.R", echo = TRUE)
 
 
-# 2. clean and filter code, extract metadata for comment and combine to all data
+# 2. clean and filter code, extract metadata for comment and combine to data_all
 source("scripts/02_create_code_data.R", echo = TRUE)
 
 
@@ -38,7 +38,7 @@ write_csv(data_comments, "data/data_level_comments.csv")
 data_codes <- data_all |>
   distinct(pick(
     country, discourse, document, comment_id, code_main, code, code_name,
-    code_created, code_system, code_orig, comment_code_segment
+    code_created, code_system, code_orig, code_segment
   ))
 
 write_csv(data_codes, "data/data_level_codes.csv")
