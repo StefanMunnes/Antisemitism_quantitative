@@ -69,12 +69,12 @@ data_code <- data_document |>
 ## temporary output files to check if code extraction was correct
 file_check <- "data/tmp/codes_check.xlsx"
 
-filter(data_codes, !is.na(code)) |>
+filter(data_code, !is.na(code)) |>
   count(code_orig, code, code_name, code_main, code_system) |>
   arrange(code_orig, code, code_name, code_main, code_system) |>
   write.xlsx(file_check, "codes_final", row.names = FALSE)
 
-filter(data_codes, is.na(code)) |>
+filter(data_code, is.na(code)) |>
   count(code_orig) |>
   arrange(desc(n)) |>
   write.xlsx(file_check, "codes_remove", append = TRUE, row.names = FALSE)
@@ -120,7 +120,7 @@ data_comment <- data_code |>
       ),
     # 2.6 get different information from metadata (doesn't work for YT)
     comment_user = str_extract(Metadata, "by (.*?) (?:\\([0-9]+ up|- lev)", 1),
-    comment_level = str_extract(Metadata, "level_([0-9]+)", 1),
+    comment_level = str_extract(Metadata, "level_([0-9]+)", 1) |> as.numeric(),
     comment_date_time = str_extract(Metadata, "[0-9\\-:, ]{15,17}") |> ymd_hm()
   ) |>
   # 2.6 create unique comment id (per document)
@@ -172,12 +172,13 @@ data_all <- data_comment |>
     comment_codes_all = unique(code) |> paste(collapse = ", "),
     comment_codes_n = n(),
     .by = c(document, comment_id)
-  ) |>
-  # 3.4 select and order all important variables
-  select(
-    country, discourse, document, code_main, code, code_name, comment,
-    comment_id, comment_code_segment, comment_user, comment_level,
-    comment_date_time, comment_codes_all, comment_codes_n, code_created,
-    code_system, code_orig, source_type, source_outlet, source_date,
-    source_title, source_comments_n, source_comments_n, source_url, source_text
   )
+# |>
+# # 3.4 select and order all important variables
+# select(
+#   country, discourse, document, code_main, code, code_name, comment,
+#   comment_id, comment_code_segment, comment_user, comment_level,
+#   comment_date_time, comment_codes_all, comment_codes_n, code_created,
+#   code_system, code_orig, source_type, source_outlet, source_date,
+#   source_title, source_comments_n, source_comments_n, source_url, source_text
+# )
