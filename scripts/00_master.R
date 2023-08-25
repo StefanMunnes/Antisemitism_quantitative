@@ -29,7 +29,8 @@ write_csv(data_documents, "data/data_level_documents.csv")
 data_comments <- data_all |>
   distinct(pick(
     country, discourse, document, comment_id, comment, comment_user,
-    comment_level, comment_date_time, comment_codes_all, comment_codes_n
+    comment_level, comment_date_time, comment_codes_all, comment_codes_n,
+    comment_ideation
   ))
 
 write_csv(data_comments, "data/data_level_comments.csv")

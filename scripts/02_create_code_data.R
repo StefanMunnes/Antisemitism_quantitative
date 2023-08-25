@@ -128,6 +128,7 @@ data_comment <- data_code |>
       ),
     # 2.6 get different information from metadata (doesn't work for YT)
     comment_user = str_extract(Metadata, "by (.*?) (?:\\([0-9]+ up|- lev)", 1),
+    comment_user = str_remove(comment_user, "\ufffc"),
     comment_level = str_extract(Metadata, "level_([0-9]+)", 1) |> as.numeric(),
     comment_date_time = str_extract(Metadata, "[0-9\\-:, ]{15,17}") |> ymd_hm()
   ) |>
@@ -153,7 +154,7 @@ as.data.frame(data_comment) |>
   filter(wrong_codings | dup_idea | no_meta | no_idea | multi_com) |>
   select(
     country, discourse, document,
-    wrong_codings, dup_ideation, no_ideation, no_metadata,
+    wrong_codings, dup_idea, no_idea, no_meta, multi_com,
     code_start, code_end, CodesComb, Metadata, Ideation
   ) |>
   arrange(country, discourse, document, code_start) |>
@@ -185,18 +186,41 @@ data_all <- data_comment |>
   ) |>
   # 3.4 remove metadata and missing codes (see validation in 1.3.3)
   filter(code != "Metadata", !is.na(code)) |>
-  # create
+  # 3.5 create variable with all codes per comment, count, and ideation variable
   mutate(
     comment_codes_all = unique(code) |> paste(collapse = ", "),
     comment_codes_n = n(),
+    comment_ideation = case_when(
+      str_count(comment_codes_all, "I[012]") == 1 ~
+        str_extract(comment_codes_all, "I[012].*?\\b"),
+      str_detect(comment_codes_all, "I1ASC") &
+        str_detect(comment_codes_all, "I1a") ~ "I1a",
+      .default = NA
+    ),
     .by = c(document, comment_id)
-  )
+  ) |>
+  # 3.6 extract comment from segment if ideation code was missing (= NA)
+  mutate(
+    code_segment = str_remove(code_segment, "(^.+?level_.:\\s*\\n*)*"),
+    code_segment_len = str_length(code_segment)
+  ) |>
+  group_by(document, comment_id) |>
+  arrange(desc(code_segment_len)) |>
+  mutate(
+    comment = ifelse(
+      is.na(comment) & !str_detect(comment_codes_all, "I[012]"),
+      first(code_segment),
+      comment
+    )
+  ) |>
+  ungroup()
 # |>
-# # 3.5 select and order all important variables
+# # 3.7 select and order all important variables
 # select(
 #   country, discourse, document, code_main, code, code_name, comment,
 #   comment_id, code_segment, comment_user, comment_level,
-#   comment_date_time, comment_codes_all, comment_codes_n, code_created,
-#   code_system, code_orig, source_type, source_outlet, source_date,
-#   source_title, source_comments_n, source_comments_n, source_url, source_text
+#   comment_date_time, comment_codes_all, comment_codes_n, comment_ideation,
+#   code_created, code_system, code_orig,
+#   source_type, source_outlet,  source_date, source_title, source_comments_n,
+#   source_comments_n, source_url, source_text
 # )

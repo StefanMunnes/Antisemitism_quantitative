@@ -65,7 +65,7 @@ data_document <- data_raw |>
   ) |>
   # 2.4 create outlet variable from document name
   mutate(
-    # 2.4.1 extract outlet from document name (first part, after source)
+    # 2.4.1 extract & clean outlet from document name (first part, after source)
     source_outlet = str_extract(document, "^(.*?)_", group = 1) |>
       str_remove("^(FB-|TWITT-|YT-)") |> # remove prefix of source_type
       str_replace("^(BBC).*", "\\1") |> # transform multiple variations of BBC
@@ -75,10 +75,13 @@ data_document <- data_raw |>
           "DERSP" = "SPIEG", "LCI.F" = "LCI", "N-TV." = "NTV",
           "MIRROR" = "MIRRO", "TF1IN" = "TF1"
         )
-      ),
+      ) |>
+      # replace important Twitter names to just first letter capital
+      str_replace_all(c("AMRO" = "Amro", "YARAH" = "Yara")),
     # 2.4.2 extract outlet from twitter document names
     source_outlet = case_when(
       str_detect(document, "_BBC_") ~ "BBC",
+      str_detect(document, "_PERMA_") ~ "BBC",
       str_detect(document, "_Guardian_") ~ "GUARD",
       str_detect(document, "_Spectator_") ~ "SPECT",
       str_detect(document, "_Figaro_") ~ "LEFIG",
@@ -92,8 +95,8 @@ data_document <- data_raw |>
       str_detect(document, "_ntv_") ~ "NTV",
       str_detect(document, "_SPIEGEL_") ~ "SPIEG",
       str_detect(document, "_WELT_") ~ "WELT",
-      str_detect(document, "_FRIE_") ~ "FRIE",
-      str_detect(document, "_AMRO_") ~ "AMRO",
+      # str_detect(document, "_FRIE_") ~ "FRIE",
+      # str_detect(document, "_AMRO_") ~ "AMRO",
       str_detect(document, "FRANCE 24") ~ "FR24",
       .default = source_outlet
     ),
@@ -109,7 +112,7 @@ data_document <- data_raw |>
       str_detect(code_orig, "Article$") ~ "Newspage",
       str_detect(code_orig, "YT-video$") ~ "YouTube"
     ),
-    source_text = ifelse(!is.na(source_type), comment_code_segment, NA) |>
+    source_text = ifelse(!is.na(source_type), code_segment, NA) |>
       first(na_rm = TRUE),
     source_type = first(source_type, na_rm = TRUE),
     .by = document
