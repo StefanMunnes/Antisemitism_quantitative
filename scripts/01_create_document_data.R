@@ -134,3 +134,5 @@ data_document <- data_raw |>
   # 2.6.2 remove (first) discourse trigger row and not valid Source
   filter(!str_detect(code_orig, "(FB-post|Tweet|Article|YT-video)$") &
     !is.na(source_text)) # ! delete here?
+
+saveRDS(data_document, "data/tmp/data_document.RDS")

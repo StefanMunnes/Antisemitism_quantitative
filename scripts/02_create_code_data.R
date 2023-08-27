@@ -34,7 +34,7 @@ regex_codes <- c(
 
 
 ## 1.3 create code: use long codes from MAXQDA output and extract last valid code
-data_code <- data_document |>
+data_code <- readRDS("data/tmp/data_document.RDS") |>
   mutate(
     # 1.3.1 extract short codes that are in the last part of long nested codes
     code = str_split_i(code_orig, "\\\\", -1) |>
@@ -88,7 +88,7 @@ filter(data_code, is.na(code)) |>
 ## 2. ideation (whole comment): I0, I0c, I1, I0ASC (given every time)
 
 data_comment <- data_code |>
-  # 2.1 filter just metadata and ideation coded comments
+  # 2.1 filter just metadata and ideation coded comments (removes if both miss)
   filter(code_main %in% c("Metadata", "1) Ideation")) |>
   # 2.2 create helper variable for wrong double coding of ideations
   arrange(document, code_start, code) |> # get right order for collapse
@@ -124,7 +124,7 @@ data_comment <- data_code |>
           # first and last part flexible (coding error, not all marked)
           str_replace("^.{4,4}", "^.*") |>
           # str_replace("(.{4,4}$)", ".*?") |>
-          paste0("\\s*\\n?") # add space and linebreak to remove (if comment)
+          paste0(":+\\s*\\n*") # add space and linebreak to remove (if comment)
       ),
     # 2.6 get different information from metadata (doesn't work for YT)
     comment_user = str_extract(Metadata, "by (.*?) (?:\\([0-9]+ up|- lev)", 1),
@@ -162,8 +162,8 @@ as.data.frame(data_comment) |>
 
 
 
-# ---- 3. final data: combine comment-wise with full code data ----
-data_all <- data_comment |>
+# ---- 3. combine comment-wise with full code data ----
+data_combined <- data_comment |>
   # ! 3.1 filter if not unique: wrong codings with same end (7 cases -> 14 dups)
   filter(
     n() == 1 | (str_detect(CodesComb, "I") & str_detect(CodesComb, "Meta")),
@@ -185,8 +185,56 @@ data_all <- data_comment |>
     relationship = "one-to-many"
   ) |>
   # 3.4 remove metadata and missing codes (see validation in 1.3.3)
-  filter(code != "Metadata", !is.na(code)) |>
-  # 3.5 create variable with all codes per comment, count, and ideation variable
+  filter(code != "Metadata", !is.na(code))
+
+
+
+# ---- 4. extract incomplete information ----
+###  comments located between start and end, didn't merge with comment data
+
+# 4.1 loop over documents and extract incomplete codes (comment_id missing)
+data_combined_incom <- lapply(unique(data_combined$document), function(doc) {
+  data <- filter(data_combined, document == doc)
+  mis <- unique(data$code_end[is.na(data$comment_id)])
+
+  if (length(mis) == 0) { # end loop if no incomplete codes
+    return(NULL)
+  } else {
+    message(doc)
+
+    # 4.2 otherwise: loop over unique missing code_end and get comment data
+    matching <- lapply(mis, function(x) {
+      filter(data, code_start <= x, code_end >= x) |>
+        select(comment_id, comment_user, comment_level, comment_date_time) |>
+        first()
+    }) |>
+      bind_rows() |>
+      mutate(code_end = mis, document = doc) |>
+      rename_with(~ paste0(.x, "_add"), starts_with("comment"))
+
+    return(matching)
+  }
+}) |>
+  bind_rows()
+
+
+
+# ---- 5. create finale (all) data; add comment wise data; clean all text ----
+data_all <-
+  # 5.1 add incomplete information to main data
+  left_join( # keep just valid (part of all combined data)
+    data_combined, data_combined_incom,
+    by = c("document", "code_end")
+  ) |>
+  mutate(comment_id = ifelse(is.na(comment_id), comment_id_add, comment_id)) |>
+  mutate(
+    across(
+      c(comment_user, comment_level, comment_date_time),
+      ~ first(.x, na_rm = TRUE)
+    ),
+    .by = c("document", "comment_id")
+  ) |>
+  # 5.2 create variable with all codes per comment, count, and ideation variable
   mutate(
     comment_codes_all = unique(code) |> paste(collapse = ", "),
     comment_codes_n = n(),
@@ -199,28 +247,31 @@ data_all <- data_comment |>
     ),
     .by = c(document, comment_id)
   ) |>
-  # 3.6 extract comment from segment if ideation code was missing (= NA)
+  # 5.3 clean comment and segment variable (unicode placeholder and metadata)
   mutate(
-    code_segment = str_remove(code_segment, "(^.+?level_.:\\s*\\n*)*"),
-    code_segment_len = str_length(code_segment)
+    comment = str_remove_all(comment, "\ufffc") |> str_squish(),
+    code_segment = str_remove(code_segment, "(^.+?level_.:\\s*\\n*)*") |>
+      str_remove_all("\ufffc") |> str_squish(),
+    code_segment_len = str_length(code_segment) # helper variable for 5.4
   ) |>
+  # 5.4 extract comment from segment (e.g. ideation code was missing (= NA))
   group_by(document, comment_id) |>
   arrange(desc(code_segment_len)) |>
   mutate(
     comment = ifelse(
-      is.na(comment) & !str_detect(comment_codes_all, "I[012]"),
+      is.na(comment), # & !str_detect(comment_codes_all, "I[012]")
       first(code_segment),
       comment
     )
   ) |>
-  ungroup()
-# |>
-# # 3.7 select and order all important variables
-# select(
-#   country, discourse, document, code_main, code, code_name, comment,
-#   comment_id, code_segment, comment_user, comment_level,
-#   comment_date_time, comment_codes_all, comment_codes_n, comment_ideation,
-#   code_created, code_system, code_orig,
-#   source_type, source_outlet,  source_date, source_title, source_comments_n,
-#   source_comments_n, source_url, source_text
-# )
+  ungroup() |>
+  arrange(country, discourse, document, comment_id, code_main) |>
+  # 5.5 select and order all important variables
+  select(
+    country, discourse, document, code_main, code, code_name, comment,
+    comment_id, code_segment, comment_user, comment_level,
+    comment_date_time, comment_codes_all, comment_codes_n, comment_ideation,
+    code_created, code_system, code_orig,
+    source_type, source_outlet, source_date, source_title, source_comments_n,
+    source_comments_n, source_url, source_text
+  )
