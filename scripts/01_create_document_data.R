@@ -102,7 +102,7 @@ data_document <- data_raw |>
     ),
     source_outlet = na_if(source_outlet, "TWITT"), # rest of twitter to NA
     # 2.5 extract date of publication
-    source_date = str_extract(document, "[0-9]{8,8}") |> as.Date("%Y%m%d")
+    source_date = str_extract(document, "[0-9]{8,8}") |> ymd() |> as_date()
   ) |>
   # 2.6.1 create source(type) from code_orig (mostly first row with trigger)
   mutate(
@@ -117,10 +117,16 @@ data_document <- data_raw |>
     source_type = first(source_type, na_rm = TRUE),
     .by = document
   ) |>
-  # extract further source related informations from raw crawler text
+  # extract further source related information from raw crawler text
   mutate(
     source_url = str_extract(source_text, "(http.+?)(\\n| )", 1),
     source_comments_n = str_extract(source_text, "([0-9]{1,5}) Comments", 1),
+    source_crawl_date = str_extract(
+      source_text, "Crawling:.+?([0-9.]{10,10})",
+      group = 1
+    ) |>
+      dmy() |>
+      as_date(),
     source_title = str_split(source_text, "\\n") |> # split on space
       sapply(first),
     source_title =

@@ -111,7 +111,11 @@ data_comment <- data_code |>
     id_cols = c(country, discourse, document, code_start),
     names_from = code_main,
     values_from = code_segment,
-    unused_fn = list(CodesComb = first, code_end = max)
+    unused_fn = list(
+      CodesComb = first,
+      code_end = max,
+      source_crawl_date = first
+    )
   ) |>
   rename(Ideation = "1) Ideation") |>
   mutate(
@@ -127,11 +131,30 @@ data_comment <- data_code |>
           paste0(":+\\s*\\n*") # add space and linebreak to remove (if comment)
       ),
     # 2.6 get different information from metadata (doesn't work for YT)
-    comment_user = str_extract(Metadata, "by (.*?) (?:\\([0-9]+ up|- lev)", 1),
+    comment_user = str_extract(Metadata, "by (.*?) (?:\\([0-9]+ )", 1),
     comment_user = str_remove(comment_user, "\ufffc"),
     comment_level = str_extract(Metadata, "level_([0-9]+)", 1) |> as.numeric(),
-    comment_date_time = str_extract(Metadata, "[0-9\\-:, ]{15,17}") |> ymd_hm()
+    # extract & calculate date of comment from scrape date and metadata
+    tmp = str_extract(Metadata, '^\"(.+?)\"', 1),
+    comment_date = case_when(
+      is.na(tmp) ~ str_extract(Metadata, "^[0-9\\-:, ]{15,17}") |>
+        ymd_hm(),
+      str_detect(tmp, "Std") ~
+        source_crawl_date - hours(str_extract(tmp, "[0-9]+")),
+      str_detect(tmp, "Tag|[dD]ay") ~
+        source_crawl_date - days(str_extract(tmp, "[0-9]+")),
+      str_detect(tmp, "Wo\\.") ~
+        source_crawl_date - weeks(str_extract(tmp, "[0-9]+")),
+      str_detect(tmp, "Monat") ~
+        source_crawl_date - (weeks(str_extract(tmp, "[0-9]+")) * 4),
+      str_detect(tmp, "J\\.") ~
+        source_crawl_date - years(str_extract(tmp, "[0-9]+")),
+      !is.na(tmp) ~ paste(tmp, str_extract(source_crawl_date, "^[0-9]{4,4}")) |>
+        dmy(),
+      .default = NA
+    )
   ) |>
+  select(!tmp) |>
   # 2.6 create unique comment id (per document)
   mutate(comment_id = row_number(), .by = c(document))
 
