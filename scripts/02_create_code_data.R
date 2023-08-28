@@ -131,12 +131,17 @@ data_comment <- data_code |>
           paste0(":+\\s*\\n*") # add space and linebreak to remove (if comment)
       ),
     # 2.6 get different information from metadata (doesn't work for YT)
-    comment_user = str_extract(Metadata, "by (.*?) (?:\\([0-9]+ )", 1),
+    comment_user = str_extract(Metadata, "by (.*?) (\\([0-9]+ |- level)", 1),
     comment_user = str_remove(comment_user, "\ufffc"),
     comment_level = str_extract(Metadata, "level_([0-9]+)", 1) |> as.numeric(),
-    # extract & calculate date of comment from scrape date and metadata
+    # 2.7 mark user names in comments for response (easy to remove)
+    tmp = unique(comment_user) |>
+      str_replace_all("(\\W)", "\\\\\\1") |>
+      paste(collapse = "|"),
+    comment = str_replace(comment, paste0("^(", tmp, ")"), "\\(@ \\1\\)"),
+    # 2.8 extract & calculate date of comment from scrape date and metadata
     tmp = str_extract(Metadata, '^\"(.+?)\"', 1),
-    comment_date = case_when(
+    comment_date_time = case_when(
       is.na(tmp) ~ str_extract(Metadata, "^[0-9\\-:, ]{15,17}") |>
         ymd_hm(),
       str_detect(tmp, "Std") ~
@@ -155,7 +160,7 @@ data_comment <- data_code |>
     )
   ) |>
   select(!tmp) |>
-  # 2.6 create unique comment id (per document)
+  # 2.9 create unique comment id (per document)
   mutate(comment_id = row_number(), .by = c(document))
 
 
@@ -216,7 +221,7 @@ data_combined <- data_comment |>
 ###  comments located between start and end, didn't merge with comment data
 
 # 4.1 loop over documents and extract incomplete codes (comment_id missing)
-data_combined_incom <- lapply(unique(data_combined$document), function(doc) {
+data_combined_incomp <- lapply(unique(data_combined$document), function(doc) {
   data <- filter(data_combined, document == doc)
   mis <- unique(data$code_end[is.na(data$comment_id)])
 
@@ -246,7 +251,7 @@ data_combined_incom <- lapply(unique(data_combined$document), function(doc) {
 data_all <-
   # 5.1 add incomplete information to main data
   left_join( # keep just valid (part of all combined data)
-    data_combined, data_combined_incom,
+    data_combined, data_combined_incomp,
     by = c("document", "code_end")
   ) |>
   mutate(comment_id = ifelse(is.na(comment_id), comment_id_add, comment_id)) |>
@@ -270,7 +275,7 @@ data_all <-
     ),
     .by = c(document, comment_id)
   ) |>
-  # 5.3 clean comment and segment variable (unicode placeholder and metadata)
+  # 5.3 clean comment and segment variable (Unicode placeholder and metadata)
   mutate(
     comment = str_remove_all(comment, "\ufffc") |> str_squish(),
     code_segment = str_remove(code_segment, "(^.+?level_.:\\s*\\n*)*") |>
