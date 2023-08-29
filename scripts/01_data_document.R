@@ -1,10 +1,4 @@
-# PROCESSING OF THE CSV EXPORTS FROM MAXQDA TO CREATE A UNIQUE CSV FILE #
-
-# 1. import raw csv files (exported MAXQDA output to xlsx and transform to csv)
-#   -> document Vars:  Country, discourse, outlet, SourceType, Source
-
-
-# ---- 1. import all csv files and create raw data ----
+# ---- 1. import all csv (exported from MAXQDA) files and create raw data ----
 
 ## 1.1 get vector with all csv files (including country subfolder)
 file_paths <- list.files(
