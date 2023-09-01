@@ -3,6 +3,9 @@ pacman::p_load(
   "tidyverse", "xlsx"
 )
 
+if (str_detect(getwd(), "scripts")) setwd("..")
+
+
 # define global objects
 file_check <- "data/tmp/codes_check.xlsx"
 
@@ -62,10 +65,10 @@ write_csv(data_comments, "data/data_level_comments.csv")
 
 ## 2.3 codes data
 data_codes <- data_all |>
-  distinct(pick(
+  select(
     country, discourse, document, comment_id, code_main, code, code_name,
     code_created, code_system, code_orig, code_segment
-  ))
+  )
 
 write_csv(data_codes, "data/data_level_codes.csv")
 
