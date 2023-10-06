@@ -34,7 +34,7 @@ plot_source_title <- data_source_title |>
   coord_flip() +
   facet_grid(~country) +
   scale_fill_manual(values = col_ideation[3:5], name = "Ideation") +
-  labs(y = "Proportion", x = "") +
+  labs(y = "proportion", x = "") +
   theme_classic() +
   theme(
     strip.text = element_text(size = 12),

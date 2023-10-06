@@ -2,6 +2,10 @@
 
 !.gitignore
 !/scripts
+!/report
 
 scripts/old
+report/*/plots
+report/*/img
 
+*.docx
