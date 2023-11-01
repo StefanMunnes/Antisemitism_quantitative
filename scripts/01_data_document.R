@@ -11,8 +11,14 @@ file_paths <- list.files(
 ## 1.2 loop over every csv file, create document variables and combine
 data_raw <- lapply(file_paths, function(path) {
   # 1.2.1 import csv and create path variabel
-  file <- read.csv(path, header = TRUE, encoding = "UTF-8") |>
-    mutate(path = path)
+  file <- tryCatch(
+    {
+      read.csv(path, header = TRUE, encoding = "UTF-8") |> mutate(path = path)
+    },
+    warning = function(w) {
+      stop("\nImport warning: ", conditionMessage(w), "\n", path)
+    }
+  )
 
   # 1.2.2 create message for imported file and size
   message(
