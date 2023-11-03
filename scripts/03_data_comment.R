@@ -89,6 +89,8 @@ data_comment <- data_comment_raw |>
   # 2.5 create unique comment id (per document)
   mutate(comment_id = row_number(), .by = c(document))
 
+saveRDS(data_comment, "data/tmp/data_comment.RDS")
+
 
 
 # ---- 3. check wrong or missing ideations/metadata ----
@@ -117,5 +119,3 @@ as.data.frame(data_comment) |>
     file_check, "codes_missing_error",
     append = TRUE, row.names = FALSE
   )
-
-saveRDS(data_comment, "data/tmp/data_comment.RDS")
