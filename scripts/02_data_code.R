@@ -46,7 +46,9 @@ data_code <- readRDS("data/tmp/data_document.RDS") |>
       code == "(D10a" ~ "D10a",
       .default = code
     ),
-    # 3.3 keep just valid extractions
+    # 3.3 remove wrong old code (new code added, old was private code)
+    code = ifelse(str_detect(code_orig, "L15 Self-reference"), "L15old", code),
+    # 3.4 keep just valid extractions
     code = if_else(
       str_detect(
         code,
@@ -55,21 +57,20 @@ data_code <- readRDS("data/tmp/data_document.RDS") |>
       code,
       NA
     ),
-    # 3.4 add special codes
+    # 3.5 add special codes
     code = if_else(
       is.na(code) & str_detect(code_orig, paste0(".*(", regex_codes, ").*")),
       str_extract(code_orig, regex_codes),
       code
     )
   ) |>
-  # 3.5 add more information from prepared external code system
+  # 3.6 add more information from prepared external code system
   left_join(code_system, by = "code")
 
 saveRDS(data_code, "data/tmp/data_code.RDS")
 
 
 ## 4. temporary output files to check if code extraction was correct
-
 filter(data_code, !is.na(code)) |>
   count(code_orig, code, code_name, code_main, code_system) |>
   arrange(code_orig, code, code_name, code_main, code_system) |>
