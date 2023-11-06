@@ -104,8 +104,15 @@ data_document <- data_raw |>
     # 2.5 extract date of publication
     source_date = str_extract(document, "[0-9]{8,8}") |> ymd() |> as_date()
   ) |>
-  # 2.6.1 create source(type) from code_orig (mostly first row with trigger)
+  # 2.6.1 create source(type) from code_orig (first row with trigger)
   mutate(
+    # correct wrong discourse trigger codes
+    code_orig = case_when(
+      str_detect(code_orig, "FB[\\- ][Pp]ost$") ~ "FB-post",
+      str_detect(code_orig, "YT[\\- ][Vv]ideo$") ~ "YT-video",
+      .default = code_orig
+    ),
+    # match trigger code for source_type variable and set for whole document
     source_type = case_when(
       str_detect(code_orig, "FB-post$") ~ "Facebook",
       str_detect(code_orig, "Tweet$") ~ "Twitter",
