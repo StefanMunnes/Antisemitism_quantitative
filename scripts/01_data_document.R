@@ -22,7 +22,7 @@ data_raw <- lapply(file_paths, function(path) {
 
   # 1.2.2 create message for imported file and size
   message(
-    str_extract(path, "((EN|DE|FR)/.+)\\.csv", 1), ": ", nrow(file), " rows"
+    str_extract(path, "((DE|FR|UK)/.+)\\.csv", 1), ": ", nrow(file), " rows"
   )
 
   # 1.2.3 for YT-Export: transform wrong Beginning/End, e.g. 2/20 -> 20 (num.)
@@ -59,7 +59,7 @@ data_document <- data_raw |>
   select(document, starts_with("code_"), starts_with("comment"), path) |>
   # 2.3 create basic document variables
   mutate(
-    country = str_extract(path, "(/)(DE|EN|FR)(/)", group = 2),
+    country = str_extract(path, "(/)(DE|FR|UK)(/)", group = 2),
     discourse = basename(gsub(".csv", "", path)),
     code_created = dmy_hms(code_created)
   ) |>
