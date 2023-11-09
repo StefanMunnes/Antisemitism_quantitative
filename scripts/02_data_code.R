@@ -1,6 +1,6 @@
 # ---- create new variable code: extract from MAXQDA codesystem ----
 
-## 1 load and prepare code system data (to merge with prepared MAXQDA data)
+## 1.1 load and prepare code system data (to merge with prepared MAXQDA data)
 code_system <- read.csv2(
   "data/doc/code_system.csv",
   col.names = "code_system"
@@ -18,6 +18,19 @@ code_system <- read.csv2(
     .before = 1
   ) |>
   bind_rows()
+
+## 1.2 load lexicon dictionary data
+lexicon_system <- read.csv2(
+  "data/doc/lexicon_dictionary.csv",
+  header = FALSE,
+  fileEncoding = "UTF-8-BOM"
+) |>
+  transmute(
+    code = str_extract(V1, "^(.+?) ", group = 1),
+    code_lex = str_extract(str_squish(V2), "(.+?) ", group = 1),
+    code_lex_name = str_extract(str_squish(V2), " (.+)", group = 1),
+  ) |>
+  arrange(code_lex)
 
 
 ## 2. prepare regex's for validation and extraction of minimal codes
@@ -65,7 +78,9 @@ data_code <- readRDS("data/tmp/data_document.RDS") |>
     )
   ) |>
   # 3.6 add more information from prepared external code system
-  left_join(code_system, by = "code")
+  left_join(code_system, by = "code") |>
+  # 3.7 add lexicon system information from prepared external file
+  left_join(lexicon_system, by = "code")
 
 saveRDS(data_code, "data/tmp/data_code.RDS")
 

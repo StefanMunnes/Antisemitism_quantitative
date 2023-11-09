@@ -34,7 +34,8 @@ data_all <- readRDS("data/tmp/data_all.RDS") |>
   arrange(country, discourse, document, comment_id, code_main) |>
   # 3.5 select and order all important variables
   select(
-    country, discourse, document, code_main, code, code_name, comment,
+    country, discourse, document, code_main,
+    code, code_name, code_lex, code_lex_name, comment,
     comment_id, code_segment, comment_user, comment_level,
     comment_date_time, comment_codes_all, comment_codes_n, comment_ideation,
     code_created, code_system, code_orig,
@@ -67,7 +68,7 @@ write_csv(data_comments, "data/data_level_comments.csv")
 data_codes <- data_all |>
   select(
     country, discourse, document, comment_id, code_main, code, code_name,
-    code_created, code_system, code_orig, code_segment
+    code_lex, code_lex_name, code_created, code_system, code_orig, code_segment
   )
 
 write_csv(data_codes, "data/data_level_codes.csv")
