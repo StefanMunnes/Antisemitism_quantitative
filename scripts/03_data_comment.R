@@ -77,7 +77,10 @@ data_comment <- data_comment_raw |>
       .default = NA
     )
   ) |>
-  # 2.4 mark user names in comments for @-reply (easy to remove)
+  # 2.4 clean comment from "object replacement character" ￼
+  mutate(comment = str_replace_all(comment, "[ \\n]*\ufffc[ \\n]*", " ")) |>
+  # 2.5 mark user names in comments for @-reply (easy to remove)
+  # 2.5.1 for normale replies loop over user names from this document threat
   mutate(
     tmp = unique(comment_user) |>
       str_replace_all("(\\W)", "\\\\\\1") |>
@@ -86,7 +89,15 @@ data_comment <- data_comment_raw |>
     .by = document
   ) |>
   select(!tmp) |>
-  # 2.5 create unique comment id (per document)
+  # 2.5.2 for Twitter/YouTube replies all @ mentions in the beginning of comment
+  mutate(
+    comment = ifelse(
+      str_detect(document, "^(TWITT|YT)"),
+      str_replace(comment, "(^.{0,3}@.*?) (?!@)", "\\(reply: \\1\\) "),
+      comment
+    )
+  ) |>
+  # 2.6 create unique comment id (per document)
   mutate(comment_id = row_number(), .by = c(document))
 
 saveRDS(data_comment, "data/tmp/data_comment.RDS")
