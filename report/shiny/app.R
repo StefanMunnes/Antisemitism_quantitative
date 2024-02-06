@@ -7,7 +7,7 @@ library(bslib)
 library(dplyr)
 library(stringr)
 library(forcats)
-library(quanteda)
+# library(quanteda)
 
 # visualisations (different plots)
 library(plotly)
@@ -446,14 +446,14 @@ server <- function(input, output) {
   # 2.1 create plot specific data (filter by discourse, code group, country)
   data_code_a <- reactive({
     fnct_data(
-      input$discourse_in_a, input$code_freq_code_in,
+      codes_list, data_code, input$discourse_in_a, input$code_freq_code_in,
       input$checkbox_cntry, input$checkbox_freq
     )
   })
 
   data_code_b <- reactive({
     fnct_data(
-      input$discourse_in_b, input$code_freq_code_in,
+      codes_list, data_code, input$discourse_in_b, input$code_freq_code_in,
       input$checkbox_cntry, input$checkbox_freq
     )
   })
@@ -548,7 +548,7 @@ server <- function(input, output) {
 
     graph <- graph_from_data_frame(
       relation,
-      vertices = codes_list["ID"], # codes_list[c("ID", "Loc")],
+      vertices = codes_list["ID"],
       directed = FALSE
     )
 
@@ -574,7 +574,7 @@ server <- function(input, output) {
 
     graph <- graph_from_data_frame(
       relation,
-      vertices = codes_list["ID"], # codes_list[c("ID", "Loc")],
+      vertices = codes_list["ID"],
       directed = FALSE
     )
 
@@ -594,6 +594,7 @@ server <- function(input, output) {
   # prepare data for keywords (by min doc occurence, by emoji, by max number)
   data_keyw_a <- reactive({
     fct_keyw_data(
+      data_ls = data_dfm_keyw_ls,
       discourse = input$discourse_in_a, country = input$keyw_cntry_in,
       ref = input$keyw_reference, min = input$keyw_min_slider,
       emoji = input$keyw_emoji, max = input$keyw_num_slider
@@ -602,6 +603,7 @@ server <- function(input, output) {
 
   data_keyw_b <- reactive({
     fct_keyw_data(
+      data_ls = data_dfm_keyw_ls,
       discourse = input$discourse_in_b, country = input$keyw_cntry_in,
       ref = input$keyw_reference, min = input$keyw_min_slider,
       emoji = input$keyw_emoji, max = input$keyw_num_slider
@@ -730,8 +732,8 @@ server <- function(input, output) {
 
   output$keyw_net_plot_a <- renderVisNetwork({
     graph_data_a <- data_dfm_keyw_ls[[input$keyw_cntry_in]][[input$discourse_in_a]][["dfm"]] |>
-      dfm_select(data_keyw_a()$feature) |>
-      fcm(context = "document") |>
+      quanteda::dfm_select(data_keyw_a()$feature) |>
+      quanteda::fcm(context = "document") |>
       graph_from_adjacency_matrix(mode = "max", diag = FALSE) |>
       fct_graph_data(data_keyw_a(), input$keyw_net_topper)
 
@@ -746,8 +748,8 @@ server <- function(input, output) {
 
   output$keyw_net_plot_b <- renderVisNetwork({
     graph_data_b <- data_dfm_keyw_ls[[input$keyw_cntry_in]][[input$discourse_in_b]][["dfm"]] |>
-      dfm_select(data_keyw_b()$feature) |>
-      fcm(context = "document") |>
+      quanteda::dfm_select(data_keyw_b()$feature) |>
+      quanteda::fcm(context = "document") |>
       graph_from_adjacency_matrix(mode = "max", diag = FALSE) |>
       fct_graph_data(data_keyw_b(), input$keyw_net_topper)
 

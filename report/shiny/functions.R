@@ -1,11 +1,11 @@
-fnct_data <- function(de_in, code_in, cntry_in, freq_in) {
+fnct_data <- function(data_a, data_b, de_in, code_in, cntry_in, freq_in) {
   # filter lexicon code list to label factor just for values
-  fct_labs <- codes_list |>
+  fct_labs <- data_a |>
     filter(.data$code_main %in% code_in)
 
   # filter for discourse event and code group
   data <- filter(
-    data_code,
+    data_b,
     .data$discourse == de_in,
     .data$code_main %in% code_in
   ) |>
@@ -41,11 +41,8 @@ fnct_data <- function(de_in, code_in, cntry_in, freq_in) {
 
 
 # create keyword data from prepared data and filter by input (create new pos)
-fct_keyw_data <- function(
-    discourse, country = input$keyw_cntry_in,
-    ref = input$keyw_reference, min = input$keyw_min_slider,
-    emoji = input$keyw_emoji, max = input$keyw_num_slider) {
-  data <- data_dfm_keyw_ls[[country]][[discourse]][["keywords"]]
+fct_keyw_data <- function(data_ls, discourse, country, ref, min, emoji, max) {
+  data <- data_ls[[country]][[discourse]][["keywords"]]
 
   # keep just target (antisemitic) keywords if input for reference is false
   if (ref == FALSE) data <- filter(data, .data$target == TRUE)
@@ -71,6 +68,10 @@ fct_keyw_data <- function(
 
   return(data)
 }
+
+
+# create bar plot for keyword frequencies
+
 
 
 # small rescale function to normalize size and width between two values
