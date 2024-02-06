@@ -20,7 +20,7 @@ code_system <- read.csv2(
   bind_rows()
 
 ## 1.2 load lexicon dictionary data
-lexicon_system <- read.csv2(
+lexicon_code_system <- read.csv2(
   "data/doc/lexicon_dictionary.csv",
   header = FALSE,
   fileEncoding = "UTF-8-BOM"
@@ -80,7 +80,7 @@ data_code <- readRDS("data/tmp/data_document.RDS") |>
   # 3.6 add more information from prepared external code system
   left_join(code_system, by = "code") |>
   # 3.7 add lexicon system information from prepared external file
-  left_join(lexicon_system, by = "code")
+  left_join(lexicon_code_system, by = "code")
 
 saveRDS(data_code, "data/tmp/data_code.RDS")
 
