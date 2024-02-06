@@ -61,6 +61,8 @@ data_document <- data_raw |>
   mutate(
     country = str_extract(path, "(/)(DE|FR|UK)(/)", group = 2),
     discourse = basename(gsub(".csv", "", path)),
+    # combine names of two separate files for UK/23_AIC_1/2
+    discourse = ifelse(str_detect(discourse, "23_AIC"), "23_AIC", discourse),
     code_created = dmy_hms(code_created)
   ) |>
   # 2.4 create outlet variable from document name
