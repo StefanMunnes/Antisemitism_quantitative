@@ -1,6 +1,9 @@
-library(dplyr)
-library(stringr)
-library(shiny)
+library(tidyverse)
+library(quanteda)
+library(quanteda.textstats)
+
+
+clr6 <- c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3", "#A6D854", "#e0b807")
 
 
 # ---- 1. prep data ----
@@ -8,22 +11,27 @@ data_all <- read_csv("data/data_all.csv")
 
 
 # 1.1 discourse event information
-discourse_title <- read_csv2("data/doc/discourse_events.csv",
-  col_names = c("discourse", "title")
+discourse_title <- read_csv2(
+  file = "data/doc/discourse_events.csv",
+  col_names = c("discourse", "title", "description")
+)
+
+tmp_discourse <- discourse_title$discourse
+names(tmp_discourse) <- ifelse(
+  !is.na(discourse_title$title),
+  discourse_title$title,
+  discourse_title$discourse
 )
 
 discourse_list <- list(
-  "2021" = discourse_title$discourse[grepl("21", discourse_title$discourse)] |>
-    str_remove("^2._"),
-  "2022" = discourse_title$discourse[grepl("22", discourse_title$discourse)] |>
-    str_remove("^2._"),
-  "2023" = discourse_title$discourse[grepl("23", discourse_title$discourse)] |>
-    str_remove("^2._")
+  "2021" = tmp_discourse[grepl("21", tmp_discourse)],
+  "2022" = tmp_discourse[grepl("22", tmp_discourse)],
+  "2023" = tmp_discourse[grepl("23", tmp_discourse)]
 )
 
-write.csv(discourse_list, "report/shiny/data/discourse_list.csv")
 
 
+# add information about discourse for table header
 data_de <- data_all |>
   distinct(country, document, comment_id, .keep_all = TRUE) |>
   summarize(
@@ -39,47 +47,40 @@ data_de <- data_all |>
   ) |>
   left_join(discourse_title)
 
-write.csv(data_de, "report/shiny/data/data_de.csv")
 
-
-# 1.2 lexicon labels
-lexicon_fct_labels <- read.csv2(
-  "data/doc/lexicon_dictionary.csv",
-  header = FALSE,
-  fileEncoding = "UTF-8-BOM"
+# 1.2 lexicon codes labels
+codes_list <- read_csv2(
+  "data/doc/codes_lab_short.csv",
+  col_names = c("code", "code_lab_short", "code_lab")
 ) |>
-  transmute(
-    code_lex = str_extract(str_squish(V2), "(.+?) ", group = 1),
-    code_lex_main = str_sub(code_lex, 1, 1) |> as.numeric(),
-    code_lex_name = str_extract(str_squish(V2), " (.+)", group = 1) |>
-      str_wrap(width = 30) |>
-      str_replace_all("\\n", "<br>")
-  ) |>
-  unique() |>
-  arrange(code_lex)
-
-write.csv(lexicon_fct_labels, "report/shiny/data/lexicon_fct_labels.csv")
+  mutate(
+    code_main = str_sub(code, 1, 1) |> as.numeric(),
+    code_clr = sapply(code_main, function(x) clr6[x]),
+    Loc = code_main,
+    ID = paste0(Loc, ".", code_lab_short)
+  )
 
 
 # 1.3 code data (proportion, code_group, colors)
 
 # create template for all valid combinations of codes, country and discourse
-
 tmp_data_de_cntry <- separate_rows(data_de, cntrs, sep = ", ") |>
   rename(country = cntrs) |>
   select(country, discourse)
 
-tmp_data_de_code <- expand.grid(
-  data_de$discourse,
-  lexicon_fct_labels$code_lex
-) |>
-  set_names(c("discourse", "code_lex"))
-
-tmp_data_de_cntry_code <- left_join(
-  tmp_data_de_cntry, tmp_data_de_code,
-  by = "discourse",
-  relationship = "many-to-many"
-)
+tmp_data_de_cntry_code <-
+  expand.grid(
+    data_de$discourse,
+    codes_list$code
+  ) |>
+  set_names(c("discourse", "code")) |>
+  left_join(codes_list, by = "code") |>
+  select(!c(Loc, ID)) |>
+  left_join(
+    tmp_data_de_cntry,
+    by = "discourse",
+    relationship = "many-to-many"
+  )
 
 
 data_code <- data_all |>
@@ -102,24 +103,116 @@ data_code <- data_all |>
   mutate(n_de = sum(n_de_ctr), .by = c(discourse, code_lex)) |>
   # calculate proportions by discourse events and by country
   mutate(
-    per_de = (n_de / N_de) * 100,
-    per_de_ctr = (n_de_ctr / N_de_ctr) * 100
+    per_de = round((n_de / N_de) * 100, 1),
+    per_de_ctr = round((n_de_ctr / N_de_ctr) * 100, 1)
   ) |>
+  rename(code = code_lex) |>
+  select(!code_lex_name) |>
   # add code template for missing codes = 0 value
   full_join(tmp_data_de_cntry_code) |>
-  # fill missing code_lex_name (join just by code)
-  group_by(code_lex) |>
-  fill(code_lex_name) |>
-  ungroup() |>
   # add zero values for missing combinations of code and country/discourse
   mutate(across(n_de_ctr:per_de_ctr, ~ ifelse(is.na(.x), 0, .x))) |>
+  # create country color
+  mutate(country_clr = sapply(as.factor(country), function(x) clr6[x]))
+
+
+
+# 2. code network plot data
+
+data_multicodes <- data_all |>
+  select(country, discourse, document, comment_id, code_lex, code_lex_name) |>
+  left_join(codes_list, by = c("code_lex_name" = "code_lab")) |>
+  filter(!is.na(code_lex)) |>
   mutate(
-    code_lex_main = str_sub(code_lex, 1, 1) |> as.numeric(),
-    color = case_when(
-      country == "DE" ~ "#ED874E",
-      country == "EN" ~ "#8da0cb",
-      country == "FR" ~ "#66c2a5"
-    )
+    group = cur_group_id(),
+    code_n = n(),
+    .by = c(country, discourse, document, comment_id)
+  ) |>
+  filter(code_n > 1)
+
+
+data_relations <- lapply(
+  split(data_multicodes, data_multicodes$group), function(d) {
+    do.call("rbind", combn(d$ID, 2, simplify = FALSE)) |> as.data.frame()
+  }
+) |>
+  bind_rows(.id = "group") |>
+  mutate(group = as.numeric(group)) |>
+  left_join(
+    distinct(data_multicodes, country, discourse, group),
+    by = "group"
+  ) |>
+  filter(V1 != V2)
+
+
+
+# prepare data for keyness and network plot
+
+data_comments <- data_all |>
+  distinct(country, document, comment_id, .keep_all = TRUE) |>
+  select(country, discourse, comment_ideation, comment, document, comment_id) |>
+  filter(!is.na(comment_ideation) & comment_ideation != "I2") |>
+  mutate(
+    antisemetic = str_detect(comment_ideation, "I0", TRUE),
+    comment = str_remove_all(comment, "\\(reply:\\s.+?\\)"),
+    comment = str_remove_all(comment, "http[s]+:.+?(\\s|$)"),
+    comment = str_replace_all(comment, "(?!\\w)\\.(?=\\w)", " ")
   )
 
-write.csv(data_code, "report/shiny/data/data_code.csv")
+
+data_corpus <- corpus(data_comments, text_field = "comment")
+
+
+tmp_ctr_discourses <- separate_rows(data_de, cntrs, sep = ", ") |>
+  select(cntrs, discourse)
+
+
+ctrs <- c("de" = "DE", "fr" = "FR", "en" = "UK")
+
+ctrs_dscs <- lapply(ctrs, function(ctr) {
+  tmp_ctr_discourses$discourse[tmp_ctr_discourses$cntrs == (ctr)]
+})
+
+
+data_dfm_keyw_ls <- lapply(names(ctrs), function(ctr) {
+  ls <- lapply(ctrs_dscs[[ctr]], function(dsc) {
+    message(ctr, " - ", dsc)
+
+    dfm <- data_corpus |>
+      corpus_subset(country == ctrs[ctr] & discourse == dsc, drop_docid = FALSE) |>
+      tokens(remove_punct = TRUE, remove_url = TRUE) |>
+      tokens_remove(pattern = "Bild") |>
+      tokens_keep(min_nchar = 2) |>
+      tokens_tolower() |>
+      tokens_remove(pattern = stopwords(ctr)) |>
+      dfm()
+
+    textst <- textstat_frequency(dfm) |> select(!c("rank", "group"))
+
+    keywords <- dfm |>
+      textstat_keyness(target = docvars(dfm, field = "antisemetic")) |>
+      mutate(
+        target = chi2 > 0,
+        color = ifelse(target, clr6[2], clr6[1]),
+        pos = ifelse(target == TRUE, row_number(), n() - row_number() + 1),
+        emoji = iconv(feature, "latin1", "ASCII", sub = "") == ""
+      ) |>
+      filter(pos < 300) |>
+      left_join(textst, by = "feature")
+
+    list("dfm" = dfm, "keywords" = keywords)
+  })
+
+  names(ls) <- ctrs_dscs[[ctr]]
+
+  return(ls)
+})
+
+names(data_dfm_keyw_ls) <- ctrs
+
+
+save(
+  discourse_title, discourse_list, data_de, codes_list, data_code,
+  data_multicodes, data_relations, data_dfm_keyw_ls,
+  file = "report/shiny/data.Rdata"
+)

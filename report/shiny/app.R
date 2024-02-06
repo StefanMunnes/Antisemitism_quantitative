@@ -1,172 +1,396 @@
-library(dplyr)
-library(stringr)
+# web app (shiny and moduls)
 library(shiny)
-library(plotly)
 library(gridlayout)
 library(bslib)
-library(DT)
+
+# data manipulation
+library(dplyr)
+library(stringr)
+library(forcats)
+library(quanteda)
+
+# visualisations (different plots)
+library(plotly)
+library(ggplot2)
+library(patchwork)
+library(edgebundleR)
+library(igraph)
+library(visNetwork)
 
 
 # ---- 1. load data ----
-
-# 1.1 discourse event information
-discourse_list <- read.csv("data/discourse_list.csv")
-data_de <- read.csv("data/data_de.csv")
-
-# 1.2 lexicon labels
-lexicon_fct_labels <- read.csv("data/lexicon_fct_labels.csv")
-
-# 1.3 code data (proportion, code_group, colors)
-data_code <- read.csv("data/data_code.csv")
+load("data.Rdata")
+load("text.Rdata")
 
 
+country_ls <- list("United Kingdome" = "UK", "Germany" = "DE", "France" = "FR")
 
-# ---- 2. create custom functions ----
-fnct_data <- function(de_in, code_in, cntry_in, freq_in) {
-  # filter lexicon code list to label factor just for values
-  fct_labs <- lexicon_fct_labels |>
-    filter(.data$code_lex_main %in% code_in)
 
-  # filter for discourse event and code group
-  data <- filter(
-    data_code,
-    .data$discourse == de_in,
-    .data$code_lex_main %in% code_in
-  ) |>
-    # add factor label for lexicon codes
-    mutate(code_lex_fct = ordered(
-      .data$code_lex,
-      levels = fct_labs$code_lex,
-      labels = fct_labs$code_lex_name
-    ))
+# ---- 2. load custom functions ----
+source("functions.R")
 
-  # create freq OR prop variables for overall discourse or separated by country
-  if (cntry_in && freq_in) {
-    data$value <- data$n_de_ctr
-  }
-  if (cntry_in && !freq_in) {
-    data$value <- data$per_de_ctr
-  }
-  if (!cntry_in && freq_in) {
-    data$value <- data$n_de
-    data <- distinct(
-      data, .data$discourse, .data$code_lex_fct, .data$value
-    )
-  }
-  if (!cntry_in && !freq_in) {
-    data$value <- data$per_de
-    data <- distinct(
-      data, .data$discourse, .data$code_lex_fct, .data$value
-    )
-  }
-
-  data
-}
 
 
 # ---- 3. UI ----
-
 ui <- grid_page(
+  # add style elements for overlaping dropdown from discourse event input
+  tags$style(".bslib-card {overflow: visible;}"),
+  tags$style(".bslib-card .card-body {overflow: visible;}"),
+  tags$style(".selectize-dropdown-content {max-height: 400px; }"),
   layout = c(
-    "header header",
-    "left_panel main_in_out"
+    "discourse_events",
+    "tabs_output     "
   ),
   row_sizes = c(
-    "40px",
-    "1fr"
+    "0.25fr",
+    "0.75fr"
   ),
   col_sizes = c(
-    "330px",
-    "1.4fr"
+    "1fr"
   ),
-  gap_size = "8px",
-  grid_card_text(
-    area = "header",
-    content = "Discourse event comparison",
-    alignment = "start",
-    is_title = TRUE
-  ),
+  gap_size = "7px",
   grid_card(
-    area = "left_panel",
+    area = "discourse_events",
     card_body(
-      gap = "8px",
-      markdown("**Plot content**"),
-      selectInput(
-        inputId = "discourse_in_a",
-        label = "Discourse Event A",
-        choices = discourse_list,
-        selected = "21_AIC"
-      ),
-      selectInput(
-        inputId = "discourse_in_b",
-        label = "Discourse Event B",
-        choices = discourse_list,
-        selected = "23_AIC"
-      ),
-      checkboxGroupInput(
-        inputId = "code_in",
-        label = "Code group",
-        choices = list(
-          "Classic Antisemitic Tropes" = 1,
-          "Tropes of Political or Financial Power" = 2,
-          "Secondary Antisemitism" = 3,
-          "Further Post-Holocaust Concepts" = 4,
-          "Attacks on Israel’s Legitimacy" = 5,
-          "Speech Acts" = 6
+      gap = "7px",
+      grid_container(
+        layout = c("discourse_input discourse_text_a discourse_text_b"),
+        gap_size = "7px",
+        col_sizes = c(
+          "0.4fr",
+          "1fr",
+          "1fr"
         ),
-        selected = 1
-      ),
-      markdown("**Plot options**"),
-      checkboxInput("checkbox_cntry", "Separate by country", value = TRUE),
-      checkboxInput("checkbox_freq", "Absolut frequencies", value = FALSE),
-      checkboxInput("checkbox_dot", "Dotchart", value = FALSE),
-      markdown(
-        "**Interpretation example**
-
-        Of the classic antisemitic tropes, Evil/The Devil is the most
-        common one in social media comments on the Arab-Israeli conflict.
-        This attribution is found in 30% to 40% of antisemitic comments in 2021.
-        Most common in Germany, least common in France.
-        Compared to the discourse event from 2023, for which data is only
-        available for the United Kingdom,
-        the percentage has decreased to just over 10%"
+        row_sizes = c(
+          "1fr"
+        ),
+        grid_card(
+          area = "discourse_input",
+          card_body(
+            selectInput(
+              inputId = "discourse_in_a",
+              label = "Discourse Event A",
+              choices = discourse_list,
+              selected = "21_AIC"
+            ),
+            selectInput(
+              inputId = "discourse_in_b",
+              label = "Discourse Event B",
+              choices = discourse_list,
+              selected = "23_AIC"
+            )
+          )
+        ),
+        grid_card(
+          area = "discourse_text_a",
+          card_body(htmlOutput(outputId = "discourse_out_a"))
+        ),
+        grid_card(
+          area = "discourse_text_b",
+          card_body(htmlOutput(outputId = "discourse_out_b"))
+        )
       )
     )
   ),
   grid_card(
-    area = "main_in_out",
+    area = "tabs_output",
+    full_screen = TRUE,
     card_body(
-      grid_container(
-        layout = c(
-          "out_text_a out_text_b",
-          "out_plot_a out_plot_b"
+      tabsetPanel(
+        nav_panel(
+          title = "Introduction",
+          grid_card(
+            area = "intro_text",
+            card_body(markdown(text$welcome))
+          )
         ),
-        row_sizes = c(
-          "0.54fr",
-          "1.84fr"
+        nav_panel(
+          title = "Label frequencies",
+          grid_container(
+            layout = c(
+              "tabs_code_freq_settings code_freq_out_a code_freq_out_b"
+            ),
+            row_sizes = c(
+              "1fr"
+            ),
+            col_sizes = c(
+              "0.4fr",
+              "1fr",
+              "1fr"
+            ),
+            gap_size = "7px",
+            grid_card(
+              area = "tabs_code_freq_settings",
+              card_body(
+                tabsetPanel(
+                  nav_panel(
+                    title = "Settings",
+                    card(
+                      card_body(
+                        checkboxGroupInput(
+                          inputId = "code_freq_code_in",
+                          label = "Label group",
+                          choices = list(
+                            "Classic Antisemitic Tropes" = 1,
+                            "Tropes of Political or Financial Power" = 2,
+                            "Secondary Antisemitism" = 3,
+                            "Further Post-Holocaust Concepts" = 4,
+                            "Attacks on Israel’s Legitimacy" = 5,
+                            "Speech Acts" = 6
+                          ),
+                          selected = 1
+                        ),
+                        markdown("**Plot options**"),
+                        checkboxInput(
+                          "checkbox_cntry", "Separate by country",
+                          value = TRUE
+                        ),
+                        checkboxInput(
+                          "checkbox_freq", "Absolut frequencies",
+                          value = FALSE
+                        ),
+                        checkboxInput(
+                          "checkbox_dot", "Dotchart",
+                          value = FALSE
+                        ),
+                      )
+                    )
+                  ),
+                  nav_panel(
+                    title = "Interpr.",
+                    markdown(text$interpr_code_freq)
+                  ),
+                  nav_panel(
+                    title = "Labels",
+                    markdown(text$codes_tbl)
+                  )
+                )
+              )
+            ),
+            grid_card(
+              area = "code_freq_out_a",
+              full_screen = TRUE,
+              card_body(
+                plotlyOutput(outputId = "code_freq_plot_a", height = "620px")
+              )
+            ),
+            grid_card(
+              area = "code_freq_out_b",
+              full_screen = TRUE,
+              card_body(
+                plotlyOutput(outputId = "code_freq_plot_b", height = "620px")
+              )
+            )
+          )
         ),
-        col_sizes = c(
-          "1fr",
-          "1fr"
+        nav_panel(
+          title = "Label co-occurrences",
+          grid_container(
+            layout = c(
+              "tabs_code_net_settings code_net_out_a code_net_out_b"
+            ),
+            row_sizes = c(
+              "1fr"
+            ),
+            col_sizes = c(
+              "0.4fr",
+              "1fr",
+              "1fr"
+            ),
+            gap_size = "7px",
+            grid_card(
+              area = "tabs_code_net_settings",
+              card_body(
+                tabsetPanel(
+                  nav_panel(
+                    title = "Settings",
+                    card(
+                      card_body(
+                        checkboxGroupInput(
+                          inputId = "code_net_cntry_in",
+                          label = "Country",
+                          choices = country_ls,
+                          selected = "UK"
+                        ),
+                        markdown("**Plot options**"),
+                        checkboxInput(
+                          "checkbox_code_net_clr", "Color label group",
+                          value = FALSE
+                        )
+                      )
+                    )
+                  ),
+                  nav_panel(
+                    title = "Interpr.",
+                    markdown(text$interpr_code_net)
+                  ),
+                  nav_panel(
+                    title = "Labels",
+                    markdown(text$codes_tbl)
+                  )
+                )
+              )
+            ),
+            grid_card(
+              area = "code_net_out_a",
+              full_screen = TRUE,
+              card_body(
+                edgebundleOutput(outputId = "code_net_plot_a", height = "620px")
+              )
+            ),
+            grid_card(
+              area = "code_net_out_b",
+              full_screen = TRUE,
+              card_body(
+                edgebundleOutput(outputId = "code_net_plot_b", height = "620px")
+              )
+            )
+          )
         ),
-        gap_size = "8px",
-        grid_card(
-          area = "out_text_a",
-          card_body(htmlOutput(outputId = "textOutput_a"))
+        nav_panel(
+          title = "Keyword frequencies",
+          grid_container(
+            layout = c(
+              "tabs_keyw_freq_settings keyw_freq_out_a keyw_freq_out_b"
+            ),
+            row_sizes = c(
+              "1fr"
+            ),
+            col_sizes = c(
+              "0.4fr",
+              "1fr",
+              "1fr"
+            ),
+            gap_size = "7px",
+            grid_card(
+              area = "tabs_keyw_freq_settings",
+              card_body(
+                tabsetPanel(
+                  nav_panel(
+                    title = "Settings",
+                    card(
+                      card_body(
+                        radioButtons(
+                          inputId = "keyw_cntry_in",
+                          label = "Country",
+                          choices = country_ls,
+                          selected = "UK"
+                        ),
+                        sliderInput(
+                          inputId = "keyw_num_slider",
+                          label = "Number of keywords",
+                          min = 5, max = 40, value = 30, step = 1
+                        ),
+                        sliderInput(
+                          inputId = "keyw_min_slider",
+                          label = "Min. num of comments incl. keyw.",
+                          min = 1, max = 15, value = 5, step = 1
+                        ),
+                        checkboxInput(
+                          inputId = "keyw_reference",
+                          label = "Show non-antisem. keyw.",
+                          value = FALSE
+                        ),
+                        checkboxInput(
+                          inputId = "keyw_emoji",
+                          label = "Include emojis",
+                          value = TRUE
+                        )
+                      )
+                    )
+                  ),
+                  nav_panel(
+                    title = "Interpr.",
+                    markdown(text$interpr_keyw_freq)
+                  )
+                )
+              )
+            ),
+            grid_card(
+              area = "keyw_freq_out_a",
+              full_screen = TRUE,
+              card_body(
+                plotOutput(outputId = "keyw_freq_plot_a", height = "620px")
+              )
+            ),
+            grid_card(
+              area = "keyw_freq_out_b",
+              full_screen = TRUE,
+              card_body(
+                plotOutput(outputId = "keyw_freq_plot_b", height = "620px")
+              )
+            )
+          )
         ),
-        grid_card(
-          area = "out_text_b",
-          card_body(htmlOutput(outputId = "textOutput_b"))
-        ),
-        grid_card(
-          area = "out_plot_a",
-          card_body(plotlyOutput(outputId = "plot_a")),
-          full_screen = TRUE
-        ),
-        grid_card(
-          area = "out_plot_b",
-          card_body(plotlyOutput(outputId = "plot_b")),
-          full_screen = TRUE
+        nav_panel(
+          title = "Keyword network",
+          grid_container(
+            layout = c(
+              "tabs_keyw_net_settings keyw_net_out_a keyw_net_out_b"
+            ),
+            row_sizes = c(
+              "1fr"
+            ),
+            col_sizes = c(
+              "0.4fr",
+              "1fr",
+              "1fr"
+            ),
+            gap_size = "7px",
+            grid_card(
+              area = "tabs_keyw_net_settings",
+              card_body(
+                tabsetPanel(
+                  nav_panel(
+                    title = "Settings",
+                    card(
+                      card_body(
+                        radioButtons(
+                          inputId = "keyw_cntry_in2",
+                          label = "Country",
+                          choices = country_ls,
+                          selected = "UK"
+                        ),
+                        sliderInput(
+                          inputId = "keyw_num_slider2",
+                          label = "Number of keywords",
+                          min = 5, max = 40, value = 20, step = 1
+                        ),
+                        sliderInput(
+                          inputId = "keyw_net_topper",
+                          label = "Top % of connections",
+                          min = 10, max = 100, value = 30, step = 5, post = "%"
+                        ),
+                        checkboxInput(
+                          inputId = "keyw_net_omit",
+                          label = "Omit isolated keywords",
+                          value = TRUE
+                        )
+                      )
+                    )
+                  ),
+                  nav_panel(
+                    title = "Interpr.",
+                    markdown(text$interpr_keyw_net)
+                  )
+                )
+              )
+            ),
+            grid_card(
+              area = "keyw_net_out_a",
+              full_screen = TRUE,
+              card_body(
+                visNetworkOutput(outputId = "keyw_net_plot_a", height = "620px")
+              )
+            ),
+            grid_card(
+              area = "keyw_net_out_b",
+              full_screen = TRUE,
+              card_body(
+                visNetworkOutput(outputId = "keyw_net_plot_b", height = "620px")
+              )
+            )
+          )
         )
       )
     )
@@ -175,84 +399,84 @@ ui <- grid_page(
 
 
 server <- function(input, output) {
-  # 1. create plot specific data (filter by discourse, code group, country)
-  data_a <- reactive({
-    fnct_data(
-      input$discourse_in_a, input$code_in,
-      input$checkbox_cntry, input$checkbox_freq
-    )
-  })
-
-  data_b <- reactive({
-    fnct_data(
-      input$discourse_in_b, input$code_in,
-      input$checkbox_cntry, input$checkbox_freq
-    )
-  })
-
-
-  # 2. create text output (by discourse event and multiple lines)
-  output$textOutput_a <- renderUI({
+  # 1. create text output (by discourse event and multiple lines)
+  output$discourse_out_a <- renderUI({
     data_de <- filter(data_de, .data$discourse == input$discourse_in_a)
 
-    line1 <- paste0("<strong>", data_de$title, "</strong>")
+    line1 <- paste0("<strong>", data_de$description, "</strong>")
     line2 <- paste(
       "From", data_de$date_min, "to", data_de$date_max,
       "in", str_count(data_de$cntrs, "\\S+"),
       ifelse(str_count(data_de$cntrs, "\\S+") == 1, "country:", "countries:"),
       data_de$cntrs
     )
-    line3 <- paste(
-      data_de$docs, "discussion threats from",
-      data_de$srcs, "unique sources"
-    )
+    # line3 <- paste(
+    #   data_de$docs, "discussion threats from",
+    #   data_de$srcs, "unique sources"
+    # )
     line4 <- paste0(
       data_de$comms, " overall comments, ",
-      data_de$comms_as, " coded as antisemitic (", data_de$comms_as_prop, "%)"
+      data_de$comms_as, " labelled as antisemitic (", data_de$comms_as_prop, "%)"
     )
-    HTML(paste(line1, line2, line3, line4, sep = "<br/>"))
+    HTML(paste(line1, line2, line4, sep = "<br/>")) # line3,
   })
 
-  output$textOutput_b <- renderUI({
+  output$discourse_out_b <- renderUI({
     data_de <- filter(data_de, .data$discourse == input$discourse_in_b)
 
-    line1 <- paste0("<strong>", data_de$title, "</strong>")
+    line1 <- paste0("<strong>", data_de$description, "</strong>")
     line2 <- paste(
       "From", data_de$date_min, "to", data_de$date_max,
       "in", str_count(data_de$cntrs, "\\S+"),
       ifelse(str_count(data_de$cntrs, "\\S+") == 1, "country:", "countries:"),
       data_de$cntrs
     )
-    line3 <- paste(
-      data_de$docs, "discussion threats from",
-      data_de$srcs, "unique sources"
-    )
+    # line3 <- paste(
+    #   data_de$docs, "discussion threats from",
+    #   data_de$srcs, "unique sources"
+    # )
     line4 <- paste0(
       data_de$comms, " overall comments, ",
-      data_de$comms_as, " coded as antisemitic (", data_de$comms_as_prop, "%)"
+      data_de$comms_as, " labelled as antisemitic (", data_de$comms_as_prop, "%)"
     )
-    HTML(paste(line1, line2, line3, line4, sep = "<br/>"))
+    HTML(paste(line1, line2, line4, sep = "<br/>")) # line3,
   })
 
 
-  # 3. create plots (by country and reactive to options)
-  output$plot_a <- renderPlotly({
+  # 2.1 create plot specific data (filter by discourse, code group, country)
+  data_code_a <- reactive({
+    fnct_data(
+      input$discourse_in_a, input$code_freq_code_in,
+      input$checkbox_cntry, input$checkbox_freq
+    )
+  })
+
+  data_code_b <- reactive({
+    fnct_data(
+      input$discourse_in_b, input$code_freq_code_in,
+      input$checkbox_cntry, input$checkbox_freq
+    )
+  })
+
+
+  # 3. create code frequencies plots (by country and reactive to options)
+  output$code_freq_plot_a <- renderPlotly({
     if (input$checkbox_cntry) {
-      colors_cntry <- data_a() |>
+      colors_cntry <- data_code_a() |>
         arrange(.data$country) |>
-        distinct(.data$color) |>
+        distinct(.data$country_clr) |>
         pull()
 
-      plot <- plot_ly(data_a(),
-        x = ~value, y = ~code_lex_fct,
+      plot <- plot_ly(data_code_a(),
+        x = ~value, y = ~code_fct,
         color = ~country, colors = colors_cntry
       )
     } else {
-      plot <- plot_ly(data_a(), x = ~value, y = ~code_lex_fct)
+      plot <- plot_ly(data_code_a(), x = ~value, y = ~code_fct)
     }
 
     if (input$checkbox_dot) {
-      plot <- add_markers(plot, opacity = 0.8)
+      plot <- add_markers(plot, size = 5, opacity = 0.8)
     } else {
       plot <- add_bars(plot)
     }
@@ -274,29 +498,30 @@ server <- function(input, output) {
     plot
   })
 
-  output$plot_b <- renderPlotly({
+  output$code_freq_plot_b <- renderPlotly({
     if (input$checkbox_cntry) {
-      colors_cntry <- data_b() |>
+      colors_cntry <- data_code_b() |>
         arrange(.data$country) |>
-        distinct(.data$color) |>
+        distinct(.data$country_clr) |>
         pull()
 
-      plot <- plot_ly(data_b(),
-        x = ~value, y = ~code_lex_fct,
+      plot <- plot_ly(data_code_b(),
+        x = ~value, y = ~code_fct,
         color = ~country, colors = colors_cntry
       )
     } else {
-      plot <- plot_ly(data_b(), x = ~value, y = ~code_lex_fct)
+      plot <- plot_ly(data_code_b(), x = ~value, y = ~code_fct)
     }
 
     if (input$checkbox_dot) {
-      plot <- add_markers(plot, opacity = 0.8)
+      plot <- add_markers(plot, size = 5, opacity = 0.8)
     } else {
       plot <- add_bars(plot)
     }
 
     plot <- layout(plot,
       yaxis = list(title = "", autorange = "reversed"),
+      # axis = list(range = list(0, ...)),
       showlegend = TRUE
     )
 
@@ -311,6 +536,231 @@ server <- function(input, output) {
 
     plot
   })
+
+  # 4. create code network plots
+  output$code_net_plot_a <- renderEdgebundle({
+    relation <- filter(
+      data_relations,
+      .data$country %in% input$code_net_cntry_in,
+      .data$discourse == input$discourse_in_a
+    ) |>
+      select(V1, V2)
+
+    graph <- graph_from_data_frame(
+      relation,
+      vertices = codes_list["ID"], # codes_list[c("ID", "Loc")],
+      directed = FALSE
+    )
+
+    V(graph)$size <- degree(graph) * 10
+
+    if (input$checkbox_code_net_clr) V(graph)$color <- codes_list$code_clr
+
+    plot <- edgebundle(graph,
+      fontsize = 12, padding = 120, cutoff = 0, width = 800,
+      tension = 0.7, nodesize = c(0, 30)
+    )
+
+    plot
+  })
+
+  output$code_net_plot_b <- renderEdgebundle({
+    relation <- filter(
+      data_relations,
+      .data$country %in% input$code_net_cntry_in,
+      .data$discourse == input$discourse_in_b
+    ) |>
+      select(V1, V2)
+
+    graph <- graph_from_data_frame(
+      relation,
+      vertices = codes_list["ID"], # codes_list[c("ID", "Loc")],
+      directed = FALSE
+    )
+
+    V(graph)$size <- degree(graph) * 10
+
+    if (input$checkbox_code_net_clr) V(graph)$color <- codes_list$code_clr
+
+    plot <- edgebundle(graph,
+      fontsize = 12, padding = 120, cutoff = 0, # width = 800,
+      tension = 0.7, nodesize = c(0, 30)
+    )
+
+    plot
+  })
+
+
+  # prepare data for keywords (by min doc occurence, by emoji, by max number)
+  data_keyw_a <- reactive({
+    fct_keyw_data(
+      discourse = input$discourse_in_a, country = input$keyw_cntry_in,
+      ref = input$keyw_reference, min = input$keyw_min_slider,
+      emoji = input$keyw_emoji, max = input$keyw_num_slider
+    )
+  })
+
+  data_keyw_b <- reactive({
+    fct_keyw_data(
+      discourse = input$discourse_in_b, country = input$keyw_cntry_in,
+      ref = input$keyw_reference, min = input$keyw_min_slider,
+      emoji = input$keyw_emoji, max = input$keyw_num_slider
+    )
+  })
+
+  output$keyw_freq_plot_a <- renderPlot({
+    data <- data_keyw_a()
+
+    plot_as <- data |>
+      filter(.data$target == TRUE) |>
+      mutate(feature = fct_reorder(.data$feature, .data$chi2)) |>
+      ggplot(aes(y = .data$feature, x = .data$chi2)) +
+      geom_bar(stat = "identity", aes(fill = .data$color)) +
+      # geom_point(aes(color = color)) +
+      theme_minimal() +
+      scale_x_continuous(
+        expand = c(0, 0),
+        limits = c(0, ceiling(max(data$chi2)[data$target == TRUE]))
+      ) +
+      scale_y_discrete(expand = expansion(add = c(0.1, 0)), position = "left") +
+      scale_fill_identity() +
+      theme(
+        legend.position = "none",
+        axis.title.y = element_blank(),
+        axis.ticks.length = unit(0, "mm"),
+        axis.line.y.left = element_line(color = "black"),
+        panel.grid.major.y = element_blank(),
+        axis.text.y = element_text(size = 18)
+      )
+
+    if (input$keyw_reference) {
+      plot_as <- plot_as + ggtitle("Antisemitic")
+
+      plot_ref <- data |>
+        filter(.data$target == FALSE) |>
+        mutate(feature = fct_reorder(.data$feature, .data$chi2)) |>
+        ggplot(aes(y = .data$feature, x = .data$chi2)) +
+        geom_bar(stat = "identity", aes(fill = .data$color)) +
+        # geom_point(aes(color = color)) +
+        theme_minimal() +
+        scale_x_continuous(
+          expand = c(0, 0),
+          limits = c(floor(min(data$chi2[data$target == FALSE])), 0)
+        ) +
+        scale_y_discrete(
+          expand = expansion(add = c(0.1, 0)), position = "right"
+        ) +
+        scale_fill_identity() +
+        theme(
+          legend.position = "none",
+          axis.title.y = element_blank(),
+          axis.ticks.length = unit(0, "mm"),
+          axis.line.y.right = element_line(color = "black"),
+          panel.grid.major.y = element_blank(),
+          axis.text.y = element_text(size = 18),
+          plot.margin = unit(c(0, 0, 0, 40), "pt")
+        ) +
+        ggtitle("Reference")
+
+      return(plot_as + plot_ref)
+    } else {
+      return(plot_as)
+    }
+  })
+
+  output$keyw_freq_plot_b <- renderPlot({
+    data <- data_keyw_b()
+
+    plot_as <- data |>
+      filter(.data$target == TRUE) |>
+      mutate(feature = fct_reorder(.data$feature, .data$chi2)) |>
+      ggplot(aes(y = .data$feature, x = .data$chi2)) +
+      geom_bar(stat = "identity", aes(fill = .data$color)) +
+      # geom_point(aes(color = color)) +
+      theme_minimal() +
+      scale_x_continuous(
+        expand = c(0, 0),
+        limits = c(0, ceiling(max(data$chi2)[data$target == TRUE]))
+      ) +
+      scale_y_discrete(expand = expansion(add = c(0.1, 0)), position = "left") +
+      scale_fill_identity() +
+      theme(
+        legend.position = "none",
+        axis.title.y = element_blank(),
+        axis.ticks.length = unit(0, "mm"),
+        axis.line.y.left = element_line(color = "black"),
+        panel.grid.major.y = element_blank(),
+        axis.text.y = element_text(size = 18)
+      )
+
+    if (input$keyw_reference) {
+      plot_as <- plot_as + ggtitle("Antisemitic")
+
+      plot_ref <- data |>
+        filter(.data$target == FALSE) |>
+        mutate(feature = fct_reorder(.data$feature, .data$chi2)) |>
+        ggplot(aes(y = .data$feature, x = .data$chi2)) +
+        geom_bar(stat = "identity", aes(fill = .data$color)) +
+        # geom_point(aes(color = color)) +
+        theme_minimal() +
+        scale_x_continuous(
+          expand = c(0, 0),
+          limits = c(floor(min(data$chi2[data$target == FALSE])), 0)
+        ) +
+        scale_y_discrete(
+          expand = expansion(add = c(0.1, 0)), position = "right"
+        ) +
+        scale_fill_identity() +
+        theme(
+          legend.position = "none",
+          axis.title.y = element_blank(),
+          axis.ticks.length = unit(0, "mm"),
+          axis.line.y.right = element_line(color = "black"),
+          panel.grid.major.y = element_blank(),
+          axis.text.y = element_text(size = 18),
+          plot.margin = unit(c(0, 0, 0, 40), "pt")
+        ) +
+        ggtitle("Reference")
+
+      return(plot_as + plot_ref)
+    } else {
+      return(plot_as)
+    }
+  })
+
+  output$keyw_net_plot_a <- renderVisNetwork({
+    graph_data_a <- data_dfm_keyw_ls[[input$keyw_cntry_in]][[input$discourse_in_a]][["dfm"]] |>
+      dfm_select(data_keyw_a()$feature) |>
+      fcm(context = "document") |>
+      graph_from_adjacency_matrix(mode = "max", diag = FALSE) |>
+      fct_graph_data(data_keyw_a(), input$keyw_net_topper)
+
+    if (input$keyw_net_omit) {
+      edges <- unique(c(graph_data_a$edges$from, graph_data_a$edges$to))
+
+      graph_data_a$nodes <- filter(graph_data_a$nodes, id %in% edges)
+    }
+
+    fct_visNet(graph_data_a$nodes, graph_data_a$edges)
+  })
+
+  output$keyw_net_plot_b <- renderVisNetwork({
+    graph_data_b <- data_dfm_keyw_ls[[input$keyw_cntry_in]][[input$discourse_in_b]][["dfm"]] |>
+      dfm_select(data_keyw_b()$feature) |>
+      fcm(context = "document") |>
+      graph_from_adjacency_matrix(mode = "max", diag = FALSE) |>
+      fct_graph_data(data_keyw_b(), input$keyw_net_topper)
+
+    if (input$keyw_net_omit) {
+      edges <- unique(c(graph_data_b$edges$from, graph_data_b$edges$to))
+
+      graph_data_b$nodes <- filter(graph_data_b$nodes, id %in% edges)
+    }
+
+    fct_visNet(graph_data_b$nodes, graph_data_b$edges)
+  })
+
+  bs_theme(font_scale = 0.5) # , `enable-gradients` = TRUE, `enable-shadows` = TRUE
 }
 
 shinyApp(ui, server)
