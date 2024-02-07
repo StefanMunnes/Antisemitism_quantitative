@@ -45,33 +45,54 @@ fct_keyw_data <- function(data_ls, discourse, country, ref, min, emoji, max) {
   data <- data_ls[[country]][[discourse]][["keywords"]]
 
   # keep just target (antisemitic) keywords if input for reference is false
-  if (ref == FALSE) data <- filter(data, .data$target == TRUE)
+  if (ref == FALSE) data <- dplyr::filter(data, .data$target == TRUE)
 
   # filter by minimum number of absolut observations (default = 5)
   data <- data |>
-    filter(.data$docfreq >= min) |>
-    mutate(pos = ifelse(
+    dplyr::filter(.data$docfreq >= min) |>
+    dplyr::mutate(pos = ifelse(
       .data$target == TRUE, row_number(), n() - row_number() + 1
     ))
 
   # filter emojis if input is FALSE
   if (emoji == FALSE) {
     data <- data |>
-      filter(.data$emoji == FALSE) |>
-      mutate(pos = ifelse(
+      dplyr::filter(.data$emoji == FALSE) |>
+      dplyr::mutate(pos = ifelse(
         .data$target == TRUE, row_number(), n() - row_number() + 1
       ))
   }
 
   # filter by max number of keywords (via input slider)
-  data <- filter(data, .data$pos <= max)
+  data <- dplyr::filter(data, .data$pos <= max)
 
   return(data)
 }
 
 
 # create bar plot for keyword frequencies
+fct_plot_keyw <- function(data, ref = FALSE) {
+  plotdata <- data |>
+    dplyr::filter(.data$target != ref) |>
+    dplyr::mutate(feature = forcats::fct_reorder(.data$feature, .data$chi2))
 
+  plot <- plotly::plot_ly(
+    data = plotdata,
+    y = ~feature, x = ~chi2,
+    hovertemplate = "Occurrence over all comments:<br>%{hovertext}",
+    hovertext = ~text,
+    color = ~target, colors = unique(plotdata$color),
+    type = "bar", orientation = "h"
+  )
+
+  if (ref) {
+    plot <- layout(plot, yaxis = list(title = "", side = "right"))
+  } else {
+    plot <- layout(plot, yaxis = list(title = ""))
+  }
+
+  return(plot)
+}
 
 
 # small rescale function to normalize size and width between two values

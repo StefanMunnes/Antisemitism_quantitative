@@ -6,13 +6,9 @@ library(bslib)
 # data manipulation
 library(dplyr)
 library(stringr)
-library(forcats)
-# library(quanteda)
 
 # visualisations (different plots)
 library(plotly)
-library(ggplot2)
-library(patchwork)
 library(edgebundleR)
 library(igraph)
 library(visNetwork)
@@ -310,14 +306,14 @@ ui <- grid_page(
               area = "keyw_freq_out_a",
               full_screen = TRUE,
               card_body(
-                plotOutput(outputId = "keyw_freq_plot_a", height = "620px")
+                plotlyOutput(outputId = "keyw_freq_plot_a", height = "620px")
               )
             ),
             grid_card(
               area = "keyw_freq_out_b",
               full_screen = TRUE,
               card_body(
-                plotOutput(outputId = "keyw_freq_plot_b", height = "620px")
+                plotlyOutput(outputId = "keyw_freq_plot_b", height = "620px")
               )
             )
           )
@@ -610,125 +606,46 @@ server <- function(input, output) {
     )
   })
 
-  output$keyw_freq_plot_a <- renderPlot({
-    data <- data_keyw_a()
+  output$keyw_freq_plot_a <- renderPlotly({
+    plotdata <- data_keyw_a()
 
-    plot_as <- data |>
-      filter(.data$target == TRUE) |>
-      mutate(feature = fct_reorder(.data$feature, .data$chi2)) |>
-      ggplot(aes(y = .data$feature, x = .data$chi2)) +
-      geom_bar(stat = "identity", aes(fill = .data$color)) +
-      # geom_point(aes(color = color)) +
-      theme_minimal() +
-      scale_x_continuous(
-        expand = c(0, 0),
-        limits = c(0, ceiling(max(data$chi2)[data$target == TRUE]))
-      ) +
-      scale_y_discrete(expand = expansion(add = c(0.1, 0)), position = "left") +
-      scale_fill_identity() +
-      theme(
-        legend.position = "none",
-        axis.title.y = element_blank(),
-        axis.ticks.length = unit(0, "mm"),
-        axis.line.y.left = element_line(color = "black"),
-        panel.grid.major.y = element_blank(),
-        axis.text.y = element_text(size = 18)
-      )
+    plot_target <- fct_plot_keyw(plotdata)
 
     if (input$keyw_reference) {
-      plot_as <- plot_as + ggtitle("Antisemitic")
+      plot_ref <- fct_plot_keyw(plotdata, ref = TRUE)
 
-      plot_ref <- data |>
-        filter(.data$target == FALSE) |>
-        mutate(feature = fct_reorder(.data$feature, .data$chi2)) |>
-        ggplot(aes(y = .data$feature, x = .data$chi2)) +
-        geom_bar(stat = "identity", aes(fill = .data$color)) +
-        # geom_point(aes(color = color)) +
-        theme_minimal() +
-        scale_x_continuous(
-          expand = c(0, 0),
-          limits = c(floor(min(data$chi2[data$target == FALSE])), 0)
-        ) +
-        scale_y_discrete(
-          expand = expansion(add = c(0.1, 0)), position = "right"
-        ) +
-        scale_fill_identity() +
-        theme(
-          legend.position = "none",
-          axis.title.y = element_blank(),
-          axis.ticks.length = unit(0, "mm"),
-          axis.line.y.right = element_line(color = "black"),
-          panel.grid.major.y = element_blank(),
-          axis.text.y = element_text(size = 18),
-          plot.margin = unit(c(0, 0, 0, 40), "pt")
-        ) +
-        ggtitle("Reference")
+      plot_comb <- subplot(plot_target, plot_ref) |>
+        layout(
+          title = "Antisemitic vs. reference keywords",
+          showlegend = FALSE
+        )
 
-      return(plot_as + plot_ref)
+      return(plot_comb)
     } else {
-      return(plot_as)
+      return(plot_target)
     }
   })
 
-  output$keyw_freq_plot_b <- renderPlot({
-    data <- data_keyw_b()
+  output$keyw_freq_plot_b <- renderPlotly({
+    plotdata <- data_keyw_b()
 
-    plot_as <- data |>
-      filter(.data$target == TRUE) |>
-      mutate(feature = fct_reorder(.data$feature, .data$chi2)) |>
-      ggplot(aes(y = .data$feature, x = .data$chi2)) +
-      geom_bar(stat = "identity", aes(fill = .data$color)) +
-      # geom_point(aes(color = color)) +
-      theme_minimal() +
-      scale_x_continuous(
-        expand = c(0, 0),
-        limits = c(0, ceiling(max(data$chi2)[data$target == TRUE]))
-      ) +
-      scale_y_discrete(expand = expansion(add = c(0.1, 0)), position = "left") +
-      scale_fill_identity() +
-      theme(
-        legend.position = "none",
-        axis.title.y = element_blank(),
-        axis.ticks.length = unit(0, "mm"),
-        axis.line.y.left = element_line(color = "black"),
-        panel.grid.major.y = element_blank(),
-        axis.text.y = element_text(size = 18)
-      )
+    plot_target <- fct_plot_keyw(plotdata)
 
     if (input$keyw_reference) {
-      plot_as <- plot_as + ggtitle("Antisemitic")
+      plot_ref <- fct_plot_keyw(plotdata, ref = TRUE)
 
-      plot_ref <- data |>
-        filter(.data$target == FALSE) |>
-        mutate(feature = fct_reorder(.data$feature, .data$chi2)) |>
-        ggplot(aes(y = .data$feature, x = .data$chi2)) +
-        geom_bar(stat = "identity", aes(fill = .data$color)) +
-        # geom_point(aes(color = color)) +
-        theme_minimal() +
-        scale_x_continuous(
-          expand = c(0, 0),
-          limits = c(floor(min(data$chi2[data$target == FALSE])), 0)
-        ) +
-        scale_y_discrete(
-          expand = expansion(add = c(0.1, 0)), position = "right"
-        ) +
-        scale_fill_identity() +
-        theme(
-          legend.position = "none",
-          axis.title.y = element_blank(),
-          axis.ticks.length = unit(0, "mm"),
-          axis.line.y.right = element_line(color = "black"),
-          panel.grid.major.y = element_blank(),
-          axis.text.y = element_text(size = 18),
-          plot.margin = unit(c(0, 0, 0, 40), "pt")
-        ) +
-        ggtitle("Reference")
+      plot_comb <- subplot(plot_target, plot_ref) |>
+        layout(
+          title = "Antisemitic vs. reference keywords",
+          showlegend = FALSE
+        )
 
-      return(plot_as + plot_ref)
+      return(plot_comb)
     } else {
-      return(plot_as)
+      return(plot_target)
     }
   })
+
 
   output$keyw_net_plot_a <- renderVisNetwork({
     graph_data_a <- data_dfm_keyw_ls[[input$keyw_cntry_in]][[input$discourse_in_a]][["dfm"]] |>

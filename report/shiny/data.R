@@ -179,7 +179,10 @@ data_dfm_keyw_ls <- lapply(names(ctrs), function(ctr) {
     message(ctr, " - ", dsc)
 
     dfm <- data_corpus |>
-      corpus_subset(country == ctrs[ctr] & discourse == dsc, drop_docid = FALSE) |>
+      corpus_subset(
+        country == ctrs[ctr] & discourse == dsc,
+        drop_docid = FALSE
+      ) |>
       tokens(remove_punct = TRUE, remove_url = TRUE) |>
       tokens_remove(pattern = "Bild") |>
       tokens_keep(min_nchar = 2) |>
@@ -195,7 +198,11 @@ data_dfm_keyw_ls <- lapply(names(ctrs), function(ctr) {
         target = chi2 > 0,
         color = ifelse(target, clr6[2], clr6[1]),
         pos = ifelse(target == TRUE, row_number(), n() - row_number() + 1),
-        emoji = iconv(feature, "latin1", "ASCII", sub = "") == ""
+        emoji = iconv(feature, "latin1", "ASCII", sub = "") == "",
+        text = str_c(
+          "N (antisemitic): ", n_target, "\n",
+          "N (non-antisemitic): ", n_reference
+        )
       ) |>
       filter(pos < 300) |>
       left_join(textst, by = "feature")
