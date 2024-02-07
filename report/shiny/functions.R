@@ -39,6 +39,16 @@ fnct_data <- function(data_a, data_b, de_in, code_in, cntry_in, freq_in) {
   return(data)
 }
 
+fct_validate <- function(data, text) {
+  validate(
+    need(
+      expr = !is.null(data),
+      message = text
+    )
+  )
+}
+
+
 
 # create keyword data from prepared data and filter by input (create new pos)
 fct_keyw_data <- function(data_ls, discourse, country, ref, min, emoji, max) {

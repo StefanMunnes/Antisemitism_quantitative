@@ -341,17 +341,6 @@ ui <- grid_page(
                     title = "Settings",
                     card(
                       card_body(
-                        radioButtons(
-                          inputId = "keyw_cntry_in2",
-                          label = "Country",
-                          choices = country_ls,
-                          selected = "UK"
-                        ),
-                        sliderInput(
-                          inputId = "keyw_num_slider2",
-                          label = "Number of keywords",
-                          min = 5, max = 40, value = 20, step = 1
-                        ),
                         sliderInput(
                           inputId = "keyw_net_topper",
                           label = "Top % of connections",
@@ -589,24 +578,42 @@ server <- function(input, output) {
 
   # prepare data for keywords (by min doc occurence, by emoji, by max number)
   data_keyw_a <- reactive({
-    fct_keyw_data(
-      data_ls = data_dfm_keyw_ls,
-      discourse = input$discourse_in_a, country = input$keyw_cntry_in,
-      ref = input$keyw_reference, min = input$keyw_min_slider,
-      emoji = input$keyw_emoji, max = input$keyw_num_slider
+    tryCatch(
+      {
+        fct_keyw_data(
+          data_ls = data_dfm_keyw_ls,
+          discourse = input$discourse_in_a, country = input$keyw_cntry_in,
+          ref = input$keyw_reference, min = input$keyw_min_slider,
+          emoji = input$keyw_emoji, max = input$keyw_num_slider
+        )
+      },
+      error = function(e) {
+        NULL
+      }
     )
   })
 
+
   data_keyw_b <- reactive({
-    fct_keyw_data(
-      data_ls = data_dfm_keyw_ls,
-      discourse = input$discourse_in_b, country = input$keyw_cntry_in,
-      ref = input$keyw_reference, min = input$keyw_min_slider,
-      emoji = input$keyw_emoji, max = input$keyw_num_slider
+    tryCatch(
+      {
+        fct_keyw_data(
+          data_ls = data_dfm_keyw_ls,
+          discourse = input$discourse_in_b, country = input$keyw_cntry_in,
+          ref = input$keyw_reference, min = input$keyw_min_slider,
+          emoji = input$keyw_emoji, max = input$keyw_num_slider
+        )
+      },
+      error = function(e) {
+        NULL
+      }
     )
   })
 
   output$keyw_freq_plot_a <- renderPlotly({
+    # check for empty data -> throw empty page
+    fct_validate(data_keyw_a(), text$validate)
+
     plotdata <- data_keyw_a()
 
     plot_target <- fct_plot_keyw(plotdata)
@@ -627,6 +634,9 @@ server <- function(input, output) {
   })
 
   output$keyw_freq_plot_b <- renderPlotly({
+    # check for empty data -> throw empty page
+    fct_validate(data_keyw_b(), text$validate)
+
     plotdata <- data_keyw_b()
 
     plot_target <- fct_plot_keyw(plotdata)
@@ -648,6 +658,9 @@ server <- function(input, output) {
 
 
   output$keyw_net_plot_a <- renderVisNetwork({
+    # check for empty data -> throw empty page
+    fct_validate(data_keyw_a(), text$validate)
+
     graph_data_a <- data_dfm_keyw_ls[[input$keyw_cntry_in]][[input$discourse_in_a]][["dfm"]] |>
       quanteda::dfm_select(data_keyw_a()$feature) |>
       quanteda::fcm(context = "document") |>
@@ -664,6 +677,9 @@ server <- function(input, output) {
   })
 
   output$keyw_net_plot_b <- renderVisNetwork({
+    # check for empty data -> throw empty page
+    fct_validate(data_keyw_b(), text$validate)
+
     graph_data_b <- data_dfm_keyw_ls[[input$keyw_cntry_in]][[input$discourse_in_b]][["dfm"]] |>
       quanteda::dfm_select(data_keyw_b()$feature) |>
       quanteda::fcm(context = "document") |>
