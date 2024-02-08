@@ -35,8 +35,8 @@ discourse_list <- list(
 data_de <- data_all |>
   distinct(country, document, comment_id, .keep_all = TRUE) |>
   summarize(
-    date_min = min(source_date, na.rm = TRUE) |> format("%d.%m.%Y"),
-    date_max = max(source_date, na.rm = TRUE) |> format("%d.%m.%Y"),
+    date_min = min(source_date, na.rm = TRUE) |> format("%b %Y"),
+    date_max = max(source_date, na.rm = TRUE) |> format("%b %Y"),
     cntrs = paste(unique(country), collapse = ", "),
     docs = n_distinct(document),
     srcs = n_distinct(source_outlet),
