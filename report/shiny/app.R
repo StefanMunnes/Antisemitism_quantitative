@@ -5,11 +5,9 @@ library(bslib)
 
 # data manipulation
 library(dplyr)
-library(stringr)
 
 # visualisations (different plots)
 library(plotly)
-library(edgebundleR)
 library(igraph)
 library(visNetwork)
 
@@ -20,6 +18,16 @@ load("text.Rdata")
 
 
 country_ls <- list("United Kingdome" = "UK", "Germany" = "DE", "France" = "FR")
+
+
+font <- "Lucida Console"
+
+# Light blue: #8FA5FD
+# Purple: #52368B
+# #fae1d9
+# #114232
+# #3d36df
+# #450a3d
 
 
 # ---- 2. load custom functions ----
@@ -33,16 +41,24 @@ ui <- grid_page(
   tags$style(".bslib-card {overflow: visible;}"),
   tags$style(".bslib-card .card-body {overflow: visible;}"),
   tags$style(".selectize-dropdown-content {max-height: 400px; }"),
+  tags$style(".selectize-dropdown, .selectize-input, .selectize-input input {font-size: 12px; }"),
+  theme = bs_theme(
+    primary = "#8FA5FD",
+    font_scale = 0.9,
+    base_font = font,
+    heading_font = "Verdana",
+    `enable-shadows` = TRUE
+  ),
   layout = c(
     "discourse_events",
     "tabs_output     "
   ),
   row_sizes = c(
-    "0.25fr",
-    "0.75fr"
+    "220px",
+    "700px"
   ),
   col_sizes = c(
-    "1fr"
+    "1.5fr"
   ),
   gap_size = "7px",
   grid_card(
@@ -53,7 +69,7 @@ ui <- grid_page(
         layout = c("discourse_input discourse_text_a discourse_text_b"),
         gap_size = "7px",
         col_sizes = c(
-          "0.4fr",
+          "0.5fr",
           "1fr",
           "1fr"
         ),
@@ -91,6 +107,7 @@ ui <- grid_page(
   grid_card(
     area = "tabs_output",
     full_screen = TRUE,
+    max_height = "700px",
     card_body(
       tabsetPanel(
         nav_panel(
@@ -110,7 +127,7 @@ ui <- grid_page(
               "1fr"
             ),
             col_sizes = c(
-              "0.4fr",
+              "0.5fr",
               "1fr",
               "1fr"
             ),
@@ -167,14 +184,14 @@ ui <- grid_page(
               area = "code_freq_out_a",
               full_screen = TRUE,
               card_body(
-                plotlyOutput(outputId = "code_freq_plot_a", height = "620px")
+                plotlyOutput(outputId = "code_freq_plot_a", height = "590px")
               )
             ),
             grid_card(
               area = "code_freq_out_b",
               full_screen = TRUE,
               card_body(
-                plotlyOutput(outputId = "code_freq_plot_b", height = "620px")
+                plotlyOutput(outputId = "code_freq_plot_b", height = "590px")
               )
             )
           )
@@ -189,7 +206,7 @@ ui <- grid_page(
               "1fr"
             ),
             col_sizes = c(
-              "0.4fr",
+              "0.5fr",
               "1fr",
               "1fr"
             ),
@@ -231,14 +248,14 @@ ui <- grid_page(
               area = "code_net_out_a",
               full_screen = TRUE,
               card_body(
-                edgebundleOutput(outputId = "code_net_plot_a", height = "620px")
+                edgebundleOutput(outputId = "code_net_plot_a", height = "590px")
               )
             ),
             grid_card(
               area = "code_net_out_b",
               full_screen = TRUE,
               card_body(
-                edgebundleOutput(outputId = "code_net_plot_b", height = "620px")
+                edgebundleOutput(outputId = "code_net_plot_b", height = "590px")
               )
             )
           )
@@ -253,7 +270,7 @@ ui <- grid_page(
               "1fr"
             ),
             col_sizes = c(
-              "0.4fr",
+              "0.5fr",
               "1fr",
               "1fr"
             ),
@@ -296,7 +313,7 @@ ui <- grid_page(
                     )
                   ),
                   nav_panel(
-                    title = "Interpr.",
+                    title = "Interpretation",
                     markdown(text$interpr_keyw_freq)
                   )
                 )
@@ -306,14 +323,14 @@ ui <- grid_page(
               area = "keyw_freq_out_a",
               full_screen = TRUE,
               card_body(
-                plotlyOutput(outputId = "keyw_freq_plot_a", height = "620px")
+                plotlyOutput(outputId = "keyw_freq_plot_a", height = "590px")
               )
             ),
             grid_card(
               area = "keyw_freq_out_b",
               full_screen = TRUE,
               card_body(
-                plotlyOutput(outputId = "keyw_freq_plot_b", height = "620px")
+                plotlyOutput(outputId = "keyw_freq_plot_b", height = "590px")
               )
             )
           )
@@ -328,7 +345,7 @@ ui <- grid_page(
               "1fr"
             ),
             col_sizes = c(
-              "0.4fr",
+              "0.5fr",
               "1fr",
               "1fr"
             ),
@@ -355,7 +372,7 @@ ui <- grid_page(
                     )
                   ),
                   nav_panel(
-                    title = "Interpr.",
+                    title = "Interpretation",
                     markdown(text$interpr_keyw_net)
                   )
                 )
@@ -365,14 +382,14 @@ ui <- grid_page(
               area = "keyw_net_out_a",
               full_screen = TRUE,
               card_body(
-                visNetworkOutput(outputId = "keyw_net_plot_a", height = "620px")
+                visNetworkOutput(outputId = "keyw_net_plot_a", height = "590px")
               )
             ),
             grid_card(
               area = "keyw_net_out_b",
               full_screen = TRUE,
               card_body(
-                visNetworkOutput(outputId = "keyw_net_plot_b", height = "620px")
+                visNetworkOutput(outputId = "keyw_net_plot_b", height = "590px")
               )
             )
           )
@@ -386,58 +403,24 @@ ui <- grid_page(
 server <- function(input, output) {
   # 1. create text output (by discourse event and multiple lines)
   output$discourse_out_a <- renderUI({
-    data_de <- filter(data_de, .data$discourse == input$discourse_in_a)
-
-    line1 <- paste0("<strong>", data_de$description, "</strong>")
-    line2 <- paste(
-      "From", data_de$date_min, "to", data_de$date_max,
-      "in", str_count(data_de$cntrs, "\\S+"),
-      ifelse(str_count(data_de$cntrs, "\\S+") == 1, "country:", "countries:"),
-      data_de$cntrs
-    )
-    # line3 <- paste(
-    #   data_de$docs, "discussion threats from",
-    #   data_de$srcs, "unique sources"
-    # )
-    line4 <- paste0(
-      data_de$comms, " overall comments, ",
-      data_de$comms_as, " labelled as antisemitic (", data_de$comms_as_prop, "%)"
-    )
-    HTML(paste(line1, line2, line4, sep = "<br/>")) # line3,
+    fct_de_text(data_de, input$discourse_in_a)
   })
 
   output$discourse_out_b <- renderUI({
-    data_de <- filter(data_de, .data$discourse == input$discourse_in_b)
-
-    line1 <- paste0("<strong>", data_de$description, "</strong>")
-    line2 <- paste(
-      "From", data_de$date_min, "to", data_de$date_max,
-      "in", str_count(data_de$cntrs, "\\S+"),
-      ifelse(str_count(data_de$cntrs, "\\S+") == 1, "country:", "countries:"),
-      data_de$cntrs
-    )
-    # line3 <- paste(
-    #   data_de$docs, "discussion threats from",
-    #   data_de$srcs, "unique sources"
-    # )
-    line4 <- paste0(
-      data_de$comms, " overall comments, ",
-      data_de$comms_as, " labelled as antisemitic (", data_de$comms_as_prop, "%)"
-    )
-    HTML(paste(line1, line2, line4, sep = "<br/>")) # line3,
+    fct_de_text(data_de, input$discourse_in_b)
   })
 
 
   # 2.1 create plot specific data (filter by discourse, code group, country)
   data_code_a <- reactive({
-    fnct_data(
+    fct_code_data(
       codes_list, data_code, input$discourse_in_a, input$code_freq_code_in,
       input$checkbox_cntry, input$checkbox_freq
     )
   })
 
   data_code_b <- reactive({
-    fnct_data(
+    fct_code_data(
       codes_list, data_code, input$discourse_in_b, input$code_freq_code_in,
       input$checkbox_cntry, input$checkbox_freq
     )
@@ -446,133 +429,33 @@ server <- function(input, output) {
 
   # 3. create code frequencies plots (by country and reactive to options)
   output$code_freq_plot_a <- renderPlotly({
-    if (input$checkbox_cntry) {
-      colors_cntry <- data_code_a() |>
-        arrange(.data$country) |>
-        distinct(.data$country_clr) |>
-        pull()
-
-      plot <- plot_ly(data_code_a(),
-        x = ~value, y = ~code_fct,
-        color = ~country, colors = colors_cntry
-      )
-    } else {
-      plot <- plot_ly(data_code_a(), x = ~value, y = ~code_fct)
-    }
-
-    if (input$checkbox_dot) {
-      plot <- add_markers(plot, size = 5, opacity = 0.8)
-    } else {
-      plot <- add_bars(plot)
-    }
-
-    plot <- layout(plot,
-      yaxis = list(title = "", autorange = "reversed"),
-      showlegend = TRUE
+    fct_code_freq_plot(
+      data = data_code_a(), country = input$checkbox_cntry,
+      dot = input$checkbox_dot, freq = input$checkbox_freq, font
     )
-    if (!input$checkbox_cntry) {
-      plot <- layout(plot, showlegend = FALSE)
-    }
-
-    if (input$checkbox_freq) {
-      plot <- layout(plot, xaxis = list(title = "Frequency"))
-    } else {
-      plot <- layout(plot, xaxis = list(title = "Percentage", ticksuffix = "%"))
-    }
-
-    plot
   })
 
   output$code_freq_plot_b <- renderPlotly({
-    if (input$checkbox_cntry) {
-      colors_cntry <- data_code_b() |>
-        arrange(.data$country) |>
-        distinct(.data$country_clr) |>
-        pull()
-
-      plot <- plot_ly(data_code_b(),
-        x = ~value, y = ~code_fct,
-        color = ~country, colors = colors_cntry
-      )
-    } else {
-      plot <- plot_ly(data_code_b(), x = ~value, y = ~code_fct)
-    }
-
-    if (input$checkbox_dot) {
-      plot <- add_markers(plot, size = 5, opacity = 0.8)
-    } else {
-      plot <- add_bars(plot)
-    }
-
-    plot <- layout(plot,
-      yaxis = list(title = "", autorange = "reversed"),
-      # axis = list(range = list(0, ...)),
-      showlegend = TRUE
+    fct_code_freq_plot(
+      data = data_code_b(), country = input$checkbox_cntry,
+      dot = input$checkbox_dot, freq = input$checkbox_freq, font
     )
-
-    if (input$checkbox_freq) {
-      plot <- layout(plot, xaxis = list(title = "Frequency"))
-    } else {
-      plot <- layout(plot, xaxis = list(title = "Percentage", ticksuffix = "%"))
-    }
-    if (!input$checkbox_cntry) {
-      plot <- layout(plot, showlegend = FALSE)
-    }
-
-    plot
   })
+
 
   # 4. create code network plots
   output$code_net_plot_a <- renderEdgebundle({
-    relation <- filter(
-      data_relations,
-      .data$country %in% input$code_net_cntry_in,
-      .data$discourse == input$discourse_in_a
-    ) |>
-      select(V1, V2)
-
-    graph <- graph_from_data_frame(
-      relation,
-      vertices = codes_list["ID"],
-      directed = FALSE
+    fct_code_net_plot(
+      data_relations, input$code_net_cntry_in, input$discourse_in_a,
+      codes_list, input$checkbox_code_net_clr
     )
-
-    V(graph)$size <- degree(graph) * 10
-
-    if (input$checkbox_code_net_clr) V(graph)$color <- codes_list$code_clr
-
-    plot <- edgebundle(graph,
-      fontsize = 12, padding = 120, cutoff = 0, width = 800,
-      tension = 0.7, nodesize = c(0, 30)
-    )
-
-    plot
   })
 
   output$code_net_plot_b <- renderEdgebundle({
-    relation <- filter(
-      data_relations,
-      .data$country %in% input$code_net_cntry_in,
-      .data$discourse == input$discourse_in_b
-    ) |>
-      select(V1, V2)
-
-    graph <- graph_from_data_frame(
-      relation,
-      vertices = codes_list["ID"],
-      directed = FALSE
+    fct_code_net_plot(
+      data_relations, input$code_net_cntry_in, input$discourse_in_b,
+      codes_list, input$checkbox_code_net_clr
     )
-
-    V(graph)$size <- degree(graph) * 10
-
-    if (input$checkbox_code_net_clr) V(graph)$color <- codes_list$code_clr
-
-    plot <- edgebundle(graph,
-      fontsize = 12, padding = 120, cutoff = 0, # width = 800,
-      tension = 0.7, nodesize = c(0, 30)
-    )
-
-    plot
   })
 
 
@@ -612,20 +495,17 @@ server <- function(input, output) {
 
   output$keyw_freq_plot_a <- renderPlotly({
     # check for empty data -> throw empty page
-    fct_validate(data_keyw_a(), text$validate)
+    validate(need(expr = !is.null(data_keyw_a()), message = text$validate))
 
     plotdata <- data_keyw_a()
 
-    plot_target <- fct_plot_keyw(plotdata)
+    plot_target <- fct_plot_keyw(plotdata, font = font)
 
     if (input$keyw_reference) {
-      plot_ref <- fct_plot_keyw(plotdata, ref = TRUE)
+      plot_ref <- fct_plot_keyw(plotdata, ref = TRUE, font = font)
 
       plot_comb <- subplot(plot_target, plot_ref) |>
-        layout(
-          title = "Antisemitic vs. reference keywords",
-          showlegend = FALSE
-        )
+        layout(title = "Antisemitic vs. reference keywords", showlegend = FALSE)
 
       return(plot_comb)
     } else {
@@ -635,20 +515,17 @@ server <- function(input, output) {
 
   output$keyw_freq_plot_b <- renderPlotly({
     # check for empty data -> throw empty page
-    fct_validate(data_keyw_b(), text$validate)
+    validate(need(expr = !is.null(data_keyw_b()), message = text$validate))
 
     plotdata <- data_keyw_b()
 
-    plot_target <- fct_plot_keyw(plotdata)
+    plot_target <- fct_plot_keyw(plotdata, font = font)
 
     if (input$keyw_reference) {
-      plot_ref <- fct_plot_keyw(plotdata, ref = TRUE)
+      plot_ref <- fct_plot_keyw(plotdata, ref = TRUE, font = font)
 
       plot_comb <- subplot(plot_target, plot_ref) |>
-        layout(
-          title = "Antisemitic vs. reference keywords",
-          showlegend = FALSE
-        )
+        layout(title = "Antisemitic vs. reference keywords", showlegend = FALSE)
 
       return(plot_comb)
     } else {
@@ -659,7 +536,7 @@ server <- function(input, output) {
 
   output$keyw_net_plot_a <- renderVisNetwork({
     # check for empty data -> throw empty page
-    fct_validate(data_keyw_a(), text$validate)
+    validate(need(expr = !is.null(data_keyw_a()), message = text$validate))
 
     graph_data_a <- data_dfm_keyw_ls[[input$keyw_cntry_in]][[input$discourse_in_a]][["dfm"]] |>
       quanteda::dfm_select(data_keyw_a()$feature) |>
@@ -678,7 +555,7 @@ server <- function(input, output) {
 
   output$keyw_net_plot_b <- renderVisNetwork({
     # check for empty data -> throw empty page
-    fct_validate(data_keyw_b(), text$validate)
+    validate(need(expr = !is.null(data_keyw_b()), message = text$validate))
 
     graph_data_b <- data_dfm_keyw_ls[[input$keyw_cntry_in]][[input$discourse_in_b]][["dfm"]] |>
       quanteda::dfm_select(data_keyw_b()$feature) |>
@@ -694,8 +571,6 @@ server <- function(input, output) {
 
     fct_visNet(graph_data_b$nodes, graph_data_b$edges)
   })
-
-  bs_theme(font_scale = 0.5) # , `enable-gradients` = TRUE, `enable-shadows` = TRUE
 }
 
 shinyApp(ui, server)

@@ -1,4 +1,27 @@
-fnct_data <- function(data_a, data_b, de_in, code_in, cntry_in, freq_in) {
+fct_de_text <- function(data, discourse) {
+  x <- data[data$discourse == discourse, ]
+
+  line1 <- paste0("<strong>", x$description, "</strong>")
+  line2 <- paste(
+    "From", x$date_min, "to", x$date_max,
+    "in", stringr::str_count(x$cntrs, "\\S+"),
+    ifelse(stringr::str_count(x$cntrs, "\\S+") == 1, "country:", "countries:"),
+    x$cntrs
+  )
+  line3 <- paste(
+    x$docs, "discussion threats from",
+    x$srcs, "unique sources."
+  )
+  line4 <- paste0(
+    x$comms, " overall comments, ",
+    x$comms_as, " (", x$comms_as_prop, "%)", "labelled as antisemitic."
+  )
+
+  shiny::HTML(paste(line1, line2, line3, line4, sep = "<br/>"))
+}
+
+
+fct_code_data <- function(data_a, data_b, de_in, code_in, cntry_in, freq_in) {
   # filter lexicon code list to label factor just for values
   fct_labs <- data_a |>
     filter(.data$code_main %in% code_in)
@@ -39,13 +62,67 @@ fnct_data <- function(data_a, data_b, de_in, code_in, cntry_in, freq_in) {
   return(data)
 }
 
-fct_validate <- function(data, text) {
-  validate(
-    need(
-      expr = !is.null(data),
-      message = text
+
+fct_code_freq_plot <- function(data, country, dot, freq, font) {
+  if (country) {
+    colors_cntry <- data |>
+      dplyr::arrange(.data$country) |>
+      dplyr::distinct(.data$country_clr) |>
+      dplyr::pull()
+
+    plot <- plot_ly(data,
+      x = ~value, y = ~code_fct,
+      color = ~country, colors = colors_cntry
     )
+  } else {
+    plot <- plot_ly(data, x = ~value, y = ~code_fct)
+  }
+
+  if (dot) {
+    plot <- add_markers(plot, size = 5, opacity = 0.8)
+  } else {
+    plot <- add_bars(plot)
+  }
+
+  plot <- layout(plot,
+    yaxis = list(title = "", autorange = "reversed"),
+    showlegend = TRUE, font = list(family = font)
   )
+
+  if (!country) {
+    plot <- layout(plot, showlegend = FALSE)
+  }
+
+  if (freq) {
+    plot <- layout(plot, xaxis = list(title = "Frequency"))
+  } else {
+    plot <- layout(plot, xaxis = list(title = "Percentage", ticksuffix = "%"))
+  }
+
+  return(plot)
+}
+
+
+fct_code_net_plot <- function(data, country, discourse, codes, color) {
+  graph <- data[
+    data$country %in% country & data$discourse == discourse,
+    c("V1", "V2")
+  ] |>
+    igraph::graph_from_data_frame(
+      vertices = codes["ID"],
+      directed = FALSE
+    )
+
+  V(graph)$size <- igraph::degree(graph) * 10
+
+  if (color) V(graph)$color <- codes$code_clr
+
+  plot <- edgebundleR::edgebundle(graph,
+    fontsize = 12, padding = 125, cutoff = 0, width = 800,
+    tension = 0.7, nodesize = c(0, 30)
+  )
+
+  return(plot)
 }
 
 
@@ -55,33 +132,31 @@ fct_keyw_data <- function(data_ls, discourse, country, ref, min, emoji, max) {
   data <- data_ls[[country]][[discourse]][["keywords"]]
 
   # keep just target (antisemitic) keywords if input for reference is false
-  if (ref == FALSE) data <- dplyr::filter(data, .data$target == TRUE)
+  if (ref == FALSE) data <- data[data$target == TRUE, ]
 
   # filter by minimum number of absolut observations (default = 5)
-  data <- data |>
-    dplyr::filter(.data$docfreq >= min) |>
+  data <- data[data$docfreq >= min, ] |>
     dplyr::mutate(pos = ifelse(
       .data$target == TRUE, row_number(), n() - row_number() + 1
     ))
 
   # filter emojis if input is FALSE
   if (emoji == FALSE) {
-    data <- data |>
-      dplyr::filter(.data$emoji == FALSE) |>
+    data <- data[data$emoji == FALSE, ] |>
       dplyr::mutate(pos = ifelse(
         .data$target == TRUE, row_number(), n() - row_number() + 1
       ))
   }
 
   # filter by max number of keywords (via input slider)
-  data <- dplyr::filter(data, .data$pos <= max)
+  data <- data[data$pos <= max, ]
 
   return(data)
 }
 
 
 # create bar plot for keyword frequencies
-fct_plot_keyw <- function(data, ref = FALSE) {
+fct_plot_keyw <- function(data, ref = FALSE, font) {
   plotdata <- data |>
     dplyr::filter(.data$target != ref) |>
     dplyr::mutate(feature = forcats::fct_reorder(.data$feature, .data$chi2))
@@ -89,11 +164,13 @@ fct_plot_keyw <- function(data, ref = FALSE) {
   plot <- plotly::plot_ly(
     data = plotdata,
     y = ~feature, x = ~chi2,
-    hovertemplate = "Occurrence over all comments:<br>%{hovertext}",
+    hovertemplate =
+      "Occurrence over all comments:<br>%{hovertext}<extra></extra>",
     hovertext = ~text,
     color = ~target, colors = unique(plotdata$color),
     type = "bar", orientation = "h"
-  )
+  ) |>
+    layout(font = list(family = font))
 
   if (ref) {
     plot <- layout(plot, yaxis = list(title = "", side = "right"))
@@ -157,9 +234,6 @@ fct_visNet <- function(nodes_df, edges_df) {
         algorithm = "all", labelOnly = FALSE, degree = 1
       ),
       selectedBy = "keyword"
-      # nodesIdSelection = list(
-      #   enabled = TRUE
-      # )
     ) |>
     visInteraction(
       hideEdgesOnDrag = TRUE,
@@ -167,7 +241,6 @@ fct_visNet <- function(nodes_df, edges_df) {
       tooltipDelay = 300
     ) |>
     visNodes(
-      # color.highlight.background = "red",
       physics = FALSE,
       font = list(strokeWidth = 7),
       shadow = list(enabled = TRUE, size = 10)
