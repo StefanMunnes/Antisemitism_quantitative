@@ -1,5 +1,8 @@
-fct_de_text <- function(data, discourse) {
+fct_de_text <- function(data, discourse, col) {
   x <- data[data$discourse == discourse, ]
+
+  if (col == "a") line0 <- paste0("<h5>Discourse Event A - ", x$title, "</h5>")
+  if (col == "b") line0 <- paste0("<h5>Discourse Event B - ", x$title, "</h5>")
 
   line1 <- paste0("<strong>", x$description, "</strong>")
   line2 <- paste(
@@ -17,44 +20,44 @@ fct_de_text <- function(data, discourse) {
     x$comms_as, " (", x$comms_as_prop, "%)", "labelled as antisemitic."
   )
 
-  shiny::HTML(paste(line1, line2, line3, line4, sep = "<br/>"))
+  shiny::HTML(paste(line0, paste(line1, line2, line3, line4, sep = "<br/>")))
 }
 
 
-fct_code_data <- function(data_a, data_b, de_in, code_in, cntry_in, freq_in) {
+fct_code_data <- function(data_code_ls, data_code, disc, code_in, cntry, freq) {
   # filter lexicon code list to label factor just for values
-  fct_labs <- data_a |>
+  fct_labs <- data_code_ls |>
     filter(.data$code_main %in% code_in)
 
   # filter for discourse event and code group
   data <- filter(
-    data_b,
-    .data$discourse == de_in,
+    data_code,
+    .data$discourse == disc,
     .data$code_main %in% code_in
   ) |>
     # add factor label for lexicon codes
-    mutate(code_fct = ordered(
+    dplyr::mutate(code_fct = ordered(
       .data$code,
       levels = fct_labs$code,
       labels = fct_labs$code_lab_short
     ))
 
   # create freq OR prop variables for overall discourse or separated by country
-  if (cntry_in && freq_in) {
+  if (cntry && freq) {
     data$value <- data$n_de_ctr
   }
-  if (cntry_in && !freq_in) {
+  if (cntry && !freq) {
     data$value <- data$per_de_ctr
   }
-  if (!cntry_in && freq_in) {
+  if (!cntry && freq) {
     data$value <- data$n_de
-    data <- distinct(
+    data <- dplyr::distinct(
       data, .data$discourse, .data$code_fct, .data$value
     )
   }
-  if (!cntry_in && !freq_in) {
+  if (!cntry && !freq) {
     data$value <- data$per_de
-    data <- distinct(
+    data <- dplyr::distinct(
       data, .data$discourse, .data$code_fct, .data$value
     )
   }
@@ -63,12 +66,9 @@ fct_code_data <- function(data_a, data_b, de_in, code_in, cntry_in, freq_in) {
 }
 
 
-fct_code_freq_plot <- function(data, country, dot, freq, font) {
+fct_code_freq_plot <- function(data, country, dot, freq, font, clr) {
   if (country) {
-    colors_cntry <- data |>
-      dplyr::arrange(.data$country) |>
-      dplyr::distinct(.data$country_clr) |>
-      dplyr::pull()
+    colors_cntry <- clr[unique(data$country)]
 
     plot <- plot_ly(data,
       x = ~value, y = ~code_fct,
@@ -103,7 +103,7 @@ fct_code_freq_plot <- function(data, country, dot, freq, font) {
 }
 
 
-fct_code_net_plot <- function(data, country, discourse, codes, color) {
+fct_code_net_plot <- function(data, country, discourse, codes, color, clr) {
   graph <- data[
     data$country %in% country & data$discourse == discourse,
     c("V1", "V2")
@@ -115,7 +115,7 @@ fct_code_net_plot <- function(data, country, discourse, codes, color) {
 
   V(graph)$size <- igraph::degree(graph) * 10
 
-  if (color) V(graph)$color <- codes$code_clr
+  if (color) V(graph)$color <- unname(clr[codes$code_main])
 
   plot <- edgebundleR::edgebundle(graph,
     fontsize = 12, padding = 125, cutoff = 0, width = 800,
@@ -128,8 +128,10 @@ fct_code_net_plot <- function(data, country, discourse, codes, color) {
 
 
 # create keyword data from prepared data and filter by input (create new pos)
-fct_keyw_data <- function(data_ls, discourse, country, ref, min, emoji, max) {
+fct_keyw_data <- function(data_ls, discourse, country, ref, min, emoji, max, clr) {
   data <- data_ls[[country]][[discourse]][["keywords"]]
+
+  data$color <- ifelse(data$target, clr[2], clr[1])
 
   # keep just target (antisemitic) keywords if input for reference is false
   if (ref == FALSE) data <- data[data$target == TRUE, ]
@@ -157,8 +159,7 @@ fct_keyw_data <- function(data_ls, discourse, country, ref, min, emoji, max) {
 
 # create bar plot for keyword frequencies
 fct_plot_keyw <- function(data, ref = FALSE, font) {
-  plotdata <- data |>
-    dplyr::filter(.data$target != ref) |>
+  plotdata <- data[data$target != ref, ] |>
     dplyr::mutate(feature = forcats::fct_reorder(.data$feature, .data$chi2))
 
   plot <- plotly::plot_ly(
@@ -191,30 +192,30 @@ rescale <- function(x, min, max) {
 
 
 # create network data (data.frame of nodes and edges in list)
-fct_graph_data <- function(graph, keyw_data, top) {
+fct_net_data <- function(graph, keyw_data, top) {
   nodes_df <- data.frame(
     id = V(graph)$name,
     keyword = V(graph)$name
   ) |>
-    left_join(
+    dplyr::left_join(
       keyw_data[c("feature", "docfreq", "color")],
       by = c("keyword" = "feature")
     ) |>
-    mutate(
+    dplyr::mutate(
       size = rescale(docfreq, 10, 30),
       font.size = size * 1.5 + 15
     ) |>
-    arrange(keyword) # sort alphabetically
+    dplyr::arrange(keyword) # sort alphabetically
 
   edges_df <- graph |>
     get.edgelist() |>
     as.data.frame() |>
     setNames(c("from", "to")) |>
-    summarize(width = n(), .by = c("from", "to")) |>
-    mutate(width = rescale(width, 2, 20)) |>
-    arrange(desc(width)) |>
-    mutate(row_per = (row_number() / n()) * 100) |>
-    mutate(row_per_max = max(row_per) |> round(0), .by = width) |>
+    dplyr::summarize(width = n(), .by = c("from", "to")) |>
+    dplyr::mutate(width = rescale(width, 2, 20)) |>
+    dplyr::arrange(desc(width)) |>
+    dplyr::mutate(row_per = (row_number() / n()) * 100) |>
+    dplyr::mutate(row_per_max = max(row_per) |> round(0), .by = width) |>
     filter(row_per_max <= top)
 
   list("nodes" = nodes_df, "edges" = edges_df)
@@ -222,7 +223,7 @@ fct_graph_data <- function(graph, keyw_data, top) {
 
 
 # network plot: nodes & edges data as input and different predefined options
-fct_visNet <- function(nodes_df, edges_df) {
+fct_visNet <- function(nodes_df, edges_df, font, clr) {
   visNetwork(nodes_df, edges_df) |>
     visIgraphLayout(
       layout = "layout.kamada.kawai", # "layout.fruchterman.reingold",
@@ -242,14 +243,14 @@ fct_visNet <- function(nodes_df, edges_df) {
     ) |>
     visNodes(
       physics = FALSE,
-      font = list(strokeWidth = 7),
+      font = list(family = font, strokeWidth = 7),
       shadow = list(enabled = TRUE, size = 10)
     ) |>
     visEdges(
       color = list(
-        color = "#7293ff",
-        highlight = "#db1a1a",
-        hover = "#f14646",
+        color = unname(clr[4]),
+        highlight = unname(clr[6]),
+        hover = unname(clr[6]),
         opacity = 0.6
       ),
       hoverWidth = 2,

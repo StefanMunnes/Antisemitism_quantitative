@@ -8,6 +8,7 @@ library(dplyr)
 
 # visualisations (different plots)
 library(plotly)
+library(edgebundleR)
 library(igraph)
 library(visNetwork)
 
@@ -19,15 +20,13 @@ load("text.Rdata")
 
 country_ls <- list("United Kingdome" = "UK", "Germany" = "DE", "France" = "FR")
 
+clr6 <- c(
+  "UK" = "#114232", "DE" = "#F09C81", "FR" = "#52368B",
+  "#8FA5FD", "#FAE1D9", "#450A3D"
+)
 
 font <- "Lucida Console"
 
-# Light blue: #8FA5FD
-# Purple: #52368B
-# #fae1d9
-# #114232
-# #3d36df
-# #450a3d
 
 
 # ---- 2. load custom functions ----
@@ -40,8 +39,10 @@ ui <- grid_page(
   # add style elements for overlaping dropdown from discourse event input
   tags$style(".bslib-card {overflow: visible;}"),
   tags$style(".bslib-card .card-body {overflow: visible;}"),
-  tags$style(".selectize-dropdown-content {max-height: 400px; }"),
-  tags$style(".selectize-dropdown, .selectize-input, .selectize-input input {font-size: 12px; }"),
+  tags$style(".selectize-dropdown-content {max-height: 400px;}"),
+  tags$style(".selectize-dropdown, .selectize-input, .selectize-input input {font-size: 12px;}"),
+  tags$style(".html-fill-container {max-height: 600px;}"),
+  tags$style(".show .bslib-mb-spacing:nth-child(1) {overflow: auto;}"),
   theme = bs_theme(
     primary = "#8FA5FD",
     font_scale = 0.9,
@@ -403,11 +404,11 @@ ui <- grid_page(
 server <- function(input, output) {
   # 1. create text output (by discourse event and multiple lines)
   output$discourse_out_a <- renderUI({
-    fct_de_text(data_de, input$discourse_in_a)
+    fct_de_text(data_de, input$discourse_in_a, "a")
   })
 
   output$discourse_out_b <- renderUI({
-    fct_de_text(data_de, input$discourse_in_b)
+    fct_de_text(data_de, input$discourse_in_b, "b")
   })
 
 
@@ -431,14 +432,14 @@ server <- function(input, output) {
   output$code_freq_plot_a <- renderPlotly({
     fct_code_freq_plot(
       data = data_code_a(), country = input$checkbox_cntry,
-      dot = input$checkbox_dot, freq = input$checkbox_freq, font
+      dot = input$checkbox_dot, freq = input$checkbox_freq, font, clr6
     )
   })
 
   output$code_freq_plot_b <- renderPlotly({
     fct_code_freq_plot(
       data = data_code_b(), country = input$checkbox_cntry,
-      dot = input$checkbox_dot, freq = input$checkbox_freq, font
+      dot = input$checkbox_dot, freq = input$checkbox_freq, font, clr6
     )
   })
 
@@ -447,14 +448,14 @@ server <- function(input, output) {
   output$code_net_plot_a <- renderEdgebundle({
     fct_code_net_plot(
       data_relations, input$code_net_cntry_in, input$discourse_in_a,
-      codes_list, input$checkbox_code_net_clr
+      codes_list, input$checkbox_code_net_clr, clr6
     )
   })
 
   output$code_net_plot_b <- renderEdgebundle({
     fct_code_net_plot(
       data_relations, input$code_net_cntry_in, input$discourse_in_b,
-      codes_list, input$checkbox_code_net_clr
+      codes_list, input$checkbox_code_net_clr, clr6
     )
   })
 
@@ -467,7 +468,7 @@ server <- function(input, output) {
           data_ls = data_dfm_keyw_ls,
           discourse = input$discourse_in_a, country = input$keyw_cntry_in,
           ref = input$keyw_reference, min = input$keyw_min_slider,
-          emoji = input$keyw_emoji, max = input$keyw_num_slider
+          emoji = input$keyw_emoji, max = input$keyw_num_slider, clr = clr6
         )
       },
       error = function(e) {
@@ -484,7 +485,7 @@ server <- function(input, output) {
           data_ls = data_dfm_keyw_ls,
           discourse = input$discourse_in_b, country = input$keyw_cntry_in,
           ref = input$keyw_reference, min = input$keyw_min_slider,
-          emoji = input$keyw_emoji, max = input$keyw_num_slider
+          emoji = input$keyw_emoji, max = input$keyw_num_slider, clr = clr6
         )
       },
       error = function(e) {
@@ -542,7 +543,7 @@ server <- function(input, output) {
       quanteda::dfm_select(data_keyw_a()$feature) |>
       quanteda::fcm(context = "document") |>
       graph_from_adjacency_matrix(mode = "max", diag = FALSE) |>
-      fct_graph_data(data_keyw_a(), input$keyw_net_topper)
+      fct_net_data(data_keyw_a(), input$keyw_net_topper)
 
     if (input$keyw_net_omit) {
       edges <- unique(c(graph_data_a$edges$from, graph_data_a$edges$to))
@@ -550,7 +551,7 @@ server <- function(input, output) {
       graph_data_a$nodes <- filter(graph_data_a$nodes, id %in% edges)
     }
 
-    fct_visNet(graph_data_a$nodes, graph_data_a$edges)
+    fct_visNet(graph_data_a$nodes, graph_data_a$edges, font, clr6)
   })
 
   output$keyw_net_plot_b <- renderVisNetwork({
@@ -561,7 +562,7 @@ server <- function(input, output) {
       quanteda::dfm_select(data_keyw_b()$feature) |>
       quanteda::fcm(context = "document") |>
       graph_from_adjacency_matrix(mode = "max", diag = FALSE) |>
-      fct_graph_data(data_keyw_b(), input$keyw_net_topper)
+      fct_net_data(data_keyw_b(), input$keyw_net_topper)
 
     if (input$keyw_net_omit) {
       edges <- unique(c(graph_data_b$edges$from, graph_data_b$edges$to))
@@ -569,7 +570,7 @@ server <- function(input, output) {
       graph_data_b$nodes <- filter(graph_data_b$nodes, id %in% edges)
     }
 
-    fct_visNet(graph_data_b$nodes, graph_data_b$edges)
+    fct_visNet(graph_data_b$nodes, graph_data_b$edges, font, clr6)
   })
 }
 

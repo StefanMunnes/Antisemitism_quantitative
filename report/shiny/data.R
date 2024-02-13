@@ -3,9 +3,6 @@ library(quanteda)
 library(quanteda.textstats)
 
 
-clr6 <- c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3", "#A6D854", "#e0b807")
-
-
 # ---- 1. prep data ----
 data_all <- read_csv("data/data_all.csv")
 
@@ -55,7 +52,6 @@ codes_list <- read_csv2(
 ) |>
   mutate(
     code_main = str_sub(code, 1, 1) |> as.numeric(),
-    code_clr = sapply(code_main, function(x) clr6[x]),
     Loc = code_main,
     ID = paste0(Loc, ".", code_lab_short)
   )
@@ -111,9 +107,7 @@ data_code <- data_all |>
   # add code template for missing codes = 0 value
   full_join(tmp_data_de_cntry_code) |>
   # add zero values for missing combinations of code and country/discourse
-  mutate(across(n_de_ctr:per_de_ctr, ~ ifelse(is.na(.x), 0, .x))) |>
-  # create country color
-  mutate(country_clr = sapply(as.factor(country), function(x) clr6[x]))
+  mutate(across(n_de_ctr:per_de_ctr, ~ ifelse(is.na(.x), 0, .x)))
 
 
 
@@ -196,7 +190,6 @@ data_dfm_keyw_ls <- lapply(names(ctrs), function(ctr) {
       textstat_keyness(target = docvars(dfm, field = "antisemetic")) |>
       mutate(
         target = chi2 > 0,
-        color = ifelse(target, clr6[2], clr6[1]),
         pos = ifelse(target == TRUE, row_number(), n() - row_number() + 1),
         emoji = iconv(feature, "latin1", "ASCII", sub = "") == "",
         text = str_c(
