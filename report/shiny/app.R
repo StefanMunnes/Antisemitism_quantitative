@@ -45,7 +45,7 @@ ui <- grid_page(
   tags$style(".show .bslib-mb-spacing:nth-child(1) {overflow: auto;}"),
   theme = bs_theme(
     primary = "#8FA5FD",
-    font_scale = 0.9,
+    font_scale = 0.85,
     base_font = font,
     heading_font = "Verdana",
     `enable-shadows` = TRUE

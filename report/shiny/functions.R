@@ -1,8 +1,8 @@
 fct_de_text <- function(data, discourse, col) {
   x <- data[data$discourse == discourse, ]
 
-  if (col == "a") line0 <- paste0("<h5>Discourse Event A - ", x$title, "</h5>")
-  if (col == "b") line0 <- paste0("<h5>Discourse Event B - ", x$title, "</h5>")
+  if (col == "a") line0 <- paste0("<h6>Discourse Event A - ", x$title, "</h6>")
+  if (col == "b") line0 <- paste0("<h6>Discourse Event B - ", x$title, "</h6>")
 
   line1 <- paste0("<strong>", x$description, "</strong>")
   line2 <- paste(
