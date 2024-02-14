@@ -27,6 +27,8 @@ discourse_list <- list(
 )
 
 
+# define language for date format (change afterwards)
+Sys.setlocale("LC_TIME", "English")
 
 # add information about discourse for table header
 data_de <- data_all |>
@@ -43,6 +45,8 @@ data_de <- data_all |>
     .by = discourse
   ) |>
   left_join(discourse_title)
+
+Sys.setlocale("LC_TIME", "German")
 
 
 # 1.2 lexicon codes labels
