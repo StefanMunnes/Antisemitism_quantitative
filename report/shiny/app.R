@@ -18,11 +18,11 @@ load("data.Rdata")
 load("text.Rdata")
 
 
-country_ls <- list("United Kingdome" = "UK", "Germany" = "DE", "France" = "FR")
+country_ls <- list("United Kingdom" = "UK", "Germany" = "DE", "France" = "FR")
 
 clr6 <- c(
-  "UK" = "#114232", "DE" = "#F09C81", "FR" = "#52368B",
-  "#8FA5FD", "#FAE1D9", "#450A3D"
+  "UK" = "#114232", "DE" = "#F09C81", "FR" = "#8FA5FD",
+  "#52368B", "#FAE1D9", "#450A3D"
 )
 
 font <- "Lucida Console"
@@ -160,11 +160,15 @@ ui <- grid_page(
                           value = TRUE
                         ),
                         checkboxInput(
-                          "checkbox_freq", "Absolut frequencies",
+                          "checkbox_freq", "Absolute frequencies",
                           value = FALSE
                         ),
                         checkboxInput(
-                          "checkbox_dot", "Dotchart",
+                          "checkbox_axis", "Equal value axis",
+                          value = TRUE
+                        ),
+                        checkboxInput(
+                          "checkbox_dot", "Dot chart",
                           value = FALSE
                         ),
                       )
@@ -297,12 +301,13 @@ ui <- grid_page(
                         ),
                         sliderInput(
                           inputId = "keyw_min_slider",
-                          label = "Min. num of comments incl. keyw.",
+                          # label = "Min. num of comments incl. keyw.",
+                          label = "Min. no. of comments incl. keywords",
                           min = 1, max = 15, value = 5, step = 1
                         ),
                         checkboxInput(
                           inputId = "keyw_reference",
-                          label = "Show non-antisem. keyw.",
+                          label = "Show non-AS keywords",
                           value = FALSE
                         ),
                         checkboxInput(
@@ -431,14 +436,16 @@ server <- function(input, output) {
   # 3. create code frequencies plots (by country and reactive to options)
   output$code_freq_plot_a <- renderPlotly({
     fct_code_freq_plot(
-      data = data_code_a(), country = input$checkbox_cntry,
+      data = data_code_a(), data2 = data_code_b(),
+      country = input$checkbox_cntry, axis = input$checkbox_axis,
       dot = input$checkbox_dot, freq = input$checkbox_freq, font, clr6
     )
   })
 
   output$code_freq_plot_b <- renderPlotly({
     fct_code_freq_plot(
-      data = data_code_b(), country = input$checkbox_cntry,
+      data = data_code_b(), data2 = data_code_a(),
+      country = input$checkbox_cntry, axis = input$checkbox_axis,
       dot = input$checkbox_dot, freq = input$checkbox_freq, font, clr6
     )
   })

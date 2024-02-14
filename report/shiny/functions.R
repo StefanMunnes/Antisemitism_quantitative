@@ -17,7 +17,7 @@ fct_de_text <- function(data, discourse, col) {
   )
   line4 <- paste0(
     x$comms, " overall comments, ",
-    x$comms_as, " (", x$comms_as_prop, "%)", "labelled as antisemitic."
+    x$comms_as, " (", x$comms_as_prop, "%)", " labelled as antisemitic."
   )
 
   shiny::HTML(paste(line0, paste(line1, line2, line3, line4, sep = "<br/>")))
@@ -66,7 +66,9 @@ fct_code_data <- function(data_code_ls, data_code, disc, code_in, cntry, freq) {
 }
 
 
-fct_code_freq_plot <- function(data, country, dot, freq, font, clr) {
+fct_code_freq_plot <- function(data, data2, country, axis, dot, freq, font, clr) {
+  
+  # add colors by country if option is choosen, otherwise default
   if (country) {
     colors_cntry <- clr[unique(data$country)]
 
@@ -75,13 +77,9 @@ fct_code_freq_plot <- function(data, country, dot, freq, font, clr) {
       color = ~country, colors = colors_cntry
     )
   } else {
-    plot <- plot_ly(data, x = ~value, y = ~code_fct)
-  }
-
-  if (dot) {
-    plot <- add_markers(plot, size = 5, opacity = 0.8)
-  } else {
-    plot <- add_bars(plot)
+    plot <- plot_ly(
+      data, x = ~value, y = ~code_fct, marker = list(color = clr[4])
+    )
   }
 
   plot <- layout(plot,
@@ -89,14 +87,23 @@ fct_code_freq_plot <- function(data, country, dot, freq, font, clr) {
     showlegend = TRUE, font = list(family = font)
   )
 
-  if (!country) {
-    plot <- layout(plot, showlegend = FALSE)
-  }
+  # choose marker type from input (bar (default) or dot chart)
+  if (dot) plot <- add_markers(plot, size = 5, opacity = 0.8)
+  if (!dot) plot <- add_bars(plot)
+
+  if (!country) plot <- layout(plot, showlegend = FALSE)
 
   if (freq) {
     plot <- layout(plot, xaxis = list(title = "Frequency"))
   } else {
     plot <- layout(plot, xaxis = list(title = "Percentage", ticksuffix = "%"))
+  }
+
+  # keep value axis constant over both plots
+  if(axis) {
+    value_max <- ceiling(max(c(data$value, data2$value)) / 10 ) * 10
+    
+    plot <- layout(plot, xaxis = list(range = list(0, value_max)))
   }
 
   return(plot)
@@ -248,7 +255,7 @@ fct_visNet <- function(nodes_df, edges_df, font, clr) {
     ) |>
     visEdges(
       color = list(
-        color = unname(clr[4]),
+        color = unname(clr[3]),
         highlight = unname(clr[6]),
         hover = unname(clr[6]),
         opacity = 0.6
