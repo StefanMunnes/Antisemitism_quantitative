@@ -9,58 +9,40 @@ welcome <- c(
   3.	the frequency distribution of antisemitic specific keywords
   4.	the network of these keywords  ",
   "  ",
-  "### Author and Reproduction Materials",
-  "[Stefan Munnes](mailto:munnes@wzb.eu)
-  ([WZB](https://www.wzb.eu/de/personen/stefan-munnes); [Decoding Antisemitism](https://decoding-antisemitism.eu/team/stefan/); [GitHub](https://github.com/StefanMunnes/Antisemitism_quantitative/tree/main/report/shiny))  ",
+  "### Author and Replication Materials",
+  "[Stefan Munnes](mailto:munnes@wzb.eu)",
+  "([WZB](https://www.wzb.eu/de/personen/stefan-munnes); [Decoding Antisemitism](https://decoding-antisemitism.eu/team/stefan/))  ",
+  "Replication Material available on [GitHub](https://github.com/StefanMunnes/Antisemitism_quantitative/tree/main/report/shiny).  ",
   "Many thanks to the Berlin Social Science Center ([WZB](https://www.wzb.eu/en)) for hosting this application."
 )
 
-codes_tbl <- c(
-  "| Short        | Label                            |
-  |--------------|----------------------------------|
-  | Oth_Foreign  | The Other/Foreign                |
-  | Evil_Devil   | Evil/The Devil                   |
-  | Child_Murder | Blood Libel/Child Murder         |
-  | Repul_Dehum  | Repulsiveness and Dehumanisation |
-  | Immorality   | Immorality                       |
-  | Lie_Deceit   | Lie and Deceit                   |
-  | Vengefulness | Vengefulness                     |
-  | Disloyalty   | Disloyalty/Jewish Loyalty        |
-  | Blame_for_AS | Blame for Antisemitism           |
-  |Greed | Greed, Exploitation and Identification with Capitalism |
-| Power | Power |
-| Conspiracy  | Conspiracy Theories |
-| Disintegration | Disintegration |
-| Self_victim | Self-victimisation |
-| Reject_Guilt | Rejection of Guilt |
-| Clean_Break | Clean Break (Schlussstrich) |
-| Dist_Den_Hol | Distortion and Denial of the Holocaust |
-| Rel_Den_AS | Relativisation and Denial of Antisemitism |
-| Inst_AS_Hol | Instrumentalisation of Antisemitism and the Holocaust |
-| NZ_Jew_Collab | Nazi-Jewish Collaboration |
-| Admonisher | Admonishers |
-| Taboo_Crit | Taboo of Criticism |
-| Not_Learn_Past | Jews Have Not Learned from the Past |
-| Jews_Resp_IL | Holding Jews Collectively Responsible for Israel’s Actions |
-| Privilege | Jewish Privilege and the ‘Free Pass’ |
-| Pro_NZ_Hit_Hol | Affirmation of Nazis, Hitler, and the Holocaust |
-| NZ_Anlgy | Nazi Analogy |
-| Fas_Anlgy | Fascism Analogies |
-| Apartheid_Anlgy | Apartheid Analogy |
-| Racist_State | Racist State |
-| Colonial_Anlgy | Colonialism Analogies |
-| Terror_State | Terrorist State |
-| Genocide | Genocide |
-| Dble_Standards | Double Standards |
-| Den_Right_Exist | Denial of Israel’s Right to Exist |
-| BDS_Boycott | BDS/Calls for Boycott |
-| IL_Sole_Guilt | Israel’s Sole Guilt in the Conflict |
-| Insults | Insults |
-| Threats | Threats |
-| Curses | Curses |
-| Death_Wishes | Death Wishes |
-| Pro_Violence | Affirming, Desiring, Calling for Violence |"
+# create table overview for short labels and long version with headings
+codes_list <- read.csv2("data/doc/codes_lab_short.csv")
+
+names(codes_list) <- c("code", "Label", "Concept name")
+
+codes_list$code_main <- as.numeric(substr(codes_list$code, 1, 1))
+
+codes_grp <- seq(1:6)
+names(codes_grp) <- c(
+  "Classic Antisemitic Tropes", "Tropes of Political or Financial Power",
+  "Secondary Antisemitism", "Further Post-Holocaust Concepts",
+  "Attacks on Israel’s Legitimacy", "Speech Acts"
 )
+
+codes_tbl_ls <- sapply(codes_grp, function(grp) {
+  table <- knitr::kable(
+    codes_list[codes_list$code_main == grp, c("Label", "Concept name")],
+    format = "markdown", row.names = FALSE
+  )
+
+  heading <- c(paste("###", names(codes_grp[grp])), table)
+  if (grp > 1) heading <- c("---", heading)
+
+  return(heading)
+})
+
+codes_tbl <- unlist(codes_tbl_ls, use.names = FALSE)
 
 
 interpr_code_freq <- "Of the classic antisemitic tropes, ‘Evil/The Devil’ is the most common in social media comments on the Arab-Israeli conflict. This attribution is found, depending on the country, in 30% to 40% of the antisemitic comments in 2021. It is most common in German data, least common in French data. Compared to the 2023 discourse event, for which data is only available for the UK, the percentage has decreased to just over 10%."
