@@ -69,7 +69,7 @@ data_document <- data_raw |>
   mutate(
     # 2.4.1 extract & clean outlet from document name (first part, after source)
     source_outlet = str_extract(document, "^(.*?)_", group = 1) |>
-      str_remove("^(FB-|TWITT-|YT-)") |> # remove prefix of source_type
+      str_remove("^(FB-|TWITT-|YT-|IN-)") |> # remove prefix of source_type
       str_replace("^(BBC).*", "\\1") |> # transform multiple variations of BBC
       str_replace("S.{1,2}DDE", "SUDDE") |> # transform Süddeu. -> error with Ü
       str_replace_all( # correct multiple typos at once
@@ -103,8 +103,11 @@ data_document <- data_raw |>
       .default = source_outlet
     ),
     source_outlet = na_if(source_outlet, "TWITT"), # rest of twitter to NA
-    # 2.5 extract date of publication
-    source_date = str_extract(document, "[0-9]{8,8}") |> ymd() |> as_date()
+    # 2.5.1 extract date of publication
+    source_date = str_extract(document, "[0-9]{8,8}") |> ymd() |> as_date(),
+    # 2.5.2 wrong date to NA (UK/23_AIC)
+    source_date = ifelse(source_date == "2021-04-18", NA, source_date) |>
+      as_date()
   ) |>
   # 2.6.1 create source(type) from code_orig (first row with trigger)
   mutate(
@@ -112,6 +115,7 @@ data_document <- data_raw |>
     code_orig = case_when(
       str_detect(code_orig, "FB[\\- ][Pp]ost$") ~ "FB-post",
       str_detect(code_orig, "YT[\\- ][Vv]ideo$") ~ "YT-video",
+      str_detect(code_orig, "Insta(gram)*[\\- ][Pp]ost$") ~ "Instagram",
       .default = code_orig
     ),
     # match trigger code for source_type variable and set for whole document
@@ -119,7 +123,8 @@ data_document <- data_raw |>
       str_detect(code_orig, "FB-post$") ~ "Facebook",
       str_detect(code_orig, "Tweet$") ~ "Twitter",
       str_detect(code_orig, "Article$") ~ "Newspage",
-      str_detect(code_orig, "YT-video$") ~ "YouTube"
+      str_detect(code_orig, "YT-video$") ~ "YouTube",
+      code_orig == "Instagram" ~ "Instagram"
     ),
     source_text = ifelse(!is.na(source_type), code_segment, NA) |>
       first(na_rm = TRUE),
@@ -147,7 +152,8 @@ data_document <- data_raw |>
       )
   ) |>
   # 2.6.2 remove (first) discourse trigger row and not valid Source
-  filter(!str_detect(code_orig, "(FB-post|Tweet|Article|YT-video)$") &
-    !is.na(source_text)) # ! delete here?
+  filter(
+    !str_detect(code_orig, "(FB-post|Twitter|Article|YT-video|Instagram)$")
+  )
 
 saveRDS(data_document, "data/tmp/data_document.RDS")

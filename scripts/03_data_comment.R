@@ -89,10 +89,10 @@ data_comment <- data_comment_raw |>
     .by = document
   ) |>
   select(!tmp) |>
-  # 2.5.2 for Twitter/YouTube replies all @ mentions in the beginning of comment
+  # 2.5.2 for Twitter/YouTube|Instagram replies all @ mentions in beginning
   mutate(
     comment = ifelse(
-      str_detect(document, "^(TWITT|YT)"),
+      str_detect(document, "^(TWITT|YT|IN)"),
       str_replace(comment, "(^.{0,3}@.*?) (?!@)", "\\(reply: \\1\\) "),
       comment
     )
